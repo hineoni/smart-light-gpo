@@ -1,0 +1,15 @@
+{
+  "name": "smart-servo-backend",
+  "version": "1.0.0",
+  "description": "Backend for controlling servo motors via ESP32",
+  "type": "module",
+  "scripts": {
+    "dev": "nitro dev --host",
+    "build": "nitro build",
+    "start": "node .output/server/index.mjs",
+    "preview": "node .output/server/index.mjs"
+  },
+  "dependencies": {
+    "nitropack": "^2.12.9"
+  }
+}

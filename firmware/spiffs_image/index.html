@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>SmartLight Setup</title>
+  <style>
+    body { font-family: Arial, sans-serif; max-width: 600px; margin: 40px auto; }
+    h1 { color:#333; }
+    label { display:block; margin-top:12px; font-weight:600; }
+    input { width:100%; padding:8px; box-sizing:border-box; }
+    button { margin-top:16px; padding:10px 16px; }
+    .status { margin-top:24px; background:#f5f5f5; padding:12px; border-radius:6px; }
+    .servo { margin-top:8px; }
+    .ok { color:green; }
+    .fail { color:red; }
+  </style>
+</head>
+<body>
+  <h1>SmartLight – Настройка</h1>
+  <form id="cfgForm">
+    <label>WiFi SSID
+      <input name="wifiSsid" />
+    </label>
+    <label>WiFi Password
+      <input name="wifiPass" type="password" />
+    </label>
+    <label>Backend WebSocket URL (например ws://backend:3000/_ws)
+      <input name="backendUrl" required />
+    </label>
+    <button type="submit">Сохранить</button>
+  </form>
+
+  <div class="status" id="statusBox">
+    <strong>Статус устройства:</strong>
+    <div id="wifiStatus">WiFi: ...</div>
+    <div id="ipStatus">IP: ...</div>
+    <div class="servo" id="servo1Status">Servo1: ...</div>
+    <div class="servo" id="servo2Status">Servo2: ...</div>
+  </div>
+
+  <div class="status">
+    <strong>Управление LED:</strong>
+    <label>Яркость (0-255):
+      <input type="range" min="0" max="255" value="255" id="brightness" onchange="updateBrightness(this.value)">
+      <span id="brightnessValue">255</span>
+    </label>
+    <label>Цвет:
+      <input type="color" id="colorPicker" onchange="updateColor(this.value)">
+    </label>
+    <button onclick="clearLeds()">Выключить LED</button>
+    <button onclick="setWhite()">Белый свет</button>
+  </div>
+
+  <script>
+    async function loadStatus(){
+      try {
+        const r = await fetch('/api/status');
+        const j = await r.json();
+        document.getElementById('wifiStatus').textContent = 'WiFi: ' + j.wifi;
+        document.getElementById('ipStatus').textContent = 'IP: ' + j.ip;
+        document.getElementById('servo1Status').textContent = `Servo1: angle=${j.servo1.angle} moving=${j.servo1.moving}`;
+        document.getElementById('servo2Status').textContent = `Servo2: angle=${j.servo2.angle} moving=${j.servo2.moving}`;
+      } catch(e){ console.warn(e); }
+    }
+    loadStatus();
+    setInterval(loadStatus, 5000);
+
+    // При первом открытии страницы заполняем форму из устройства
+    (async function(){
+      try {
+        const r = await fetch('/api/status');
+        const j = await r.json();
+        if(j.wifiSsid) document.querySelector('input[name=wifiSsid]').value = j.wifiSsid;
+        if(j.wifiPass) document.querySelector('input[name=wifiPass]').value = j.wifiPass;
+        if(j.backendUrl) document.querySelector('input[name=backendUrl]').value = j.backendUrl;
+      } catch(e){}
+    })();
+
+    document.getElementById('cfgForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const data = Object.fromEntries(new FormData(e.target));
+      const res = await fetch('/api/config', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data)
+      });
+      if(res.ok){
+        alert('Сохранено! Перезагрузите устройство или вручную перезапустите питание.');
+      } else {
+        alert('Ошибка сохранения.');
+      }
+    });
+
+    // Функции управления LED
+    function updateBrightness(value) {
+      document.getElementById('brightnessValue').textContent = value;
+      sendLedCommand('set_led_brightness', { brightness: parseInt(value) });
+    }
+
+    function updateColor(hexColor) {
+      const r = parseInt(hexColor.substr(1, 2), 16);
+      const g = parseInt(hexColor.substr(3, 2), 16);
+      const b = parseInt(hexColor.substr(5, 2), 16);
+      sendLedCommand('set_led_color', { r: r, g: g, b: b });
+    }
+
+    function clearLeds() {
+      sendLedCommand('clear_leds', {});
+    }
+
+    function setWhite() {
+      sendLedCommand('set_led_color', { r: 255, g: 255, b: 255 });
+      document.getElementById('colorPicker').value = '#ffffff';
+    }
+
+    async function sendLedCommand(type, data) {
+      try {
+        const command = { type: type, ...data };
+        // В данном случае отправляем команды через HTTP API
+        // В реальном приложении это должно быть через WebSocket
+        await fetch('/api/led', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(command)
+        });
+      } catch (e) {
+        console.error('Failed to send LED command:', e);
+      }
+    }
+  </script>
+</body>
+</html>

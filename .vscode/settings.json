@@ -1,0 +1,6 @@
+{
+    "idf.portWin": "COM9",
+    "idf.espIdfPathWin": "c:\\Work\\pet-projects\\smart-light\\soft\\ESP-IDF\\esp-idf-v5.5.1\\tools\\v5.5.1\\esp-idf",
+    "idf.toolsPathWin": "c:\\Work\\pet-projects\\smart-light\\soft",
+    "idf.pythonInstallPath": "/opt/homebrew/bin/python3",
+}
