@@ -1,0 +1,36 @@
+menu "SmartLight Configuration"
+
+    config SMARTLIGHT_DEFAULT_AP_SSID
+        string "Default AP SSID"
+        default "SmartLight-Setup"
+        help
+            WiFi SSID when device is in configuration mode
+
+    config SMARTLIGHT_DEFAULT_AP_PASSWORD
+        string "Default AP Password"
+        default "smartlight"
+        help
+            WiFi password when device is in configuration mode
+
+    config SMARTLIGHT_SERVO1_PIN
+        int "Servo 1 GPIO Pin"
+        range 0 39
+        default 12
+        help
+            GPIO pin for first servo motor
+
+    config SMARTLIGHT_SERVO2_PIN
+        int "Servo 2 GPIO Pin"
+        range 0 39
+        default 14
+        help
+            GPIO pin for second servo motor
+
+    config SMARTLIGHT_HEARTBEAT_INTERVAL
+        int "WebSocket Heartbeat Interval (ms)"
+        range 5000 60000
+        default 15000
+        help
+            Interval in milliseconds for sending heartbeat messages to backend
+
+endmenu
