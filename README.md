@@ -24,6 +24,7 @@ API приложения:
 | `/_scalar` | ANY | Scalar UI для просмотра OpenAPI |
 
 Более подробно с мобильным приложениям можно ознакомиться ниже:
+
 <img width="259" height="351" alt="изображение" src="https://github.com/user-attachments/assets/5d21403a-a8c3-4eb5-b599-d5a691439bd1" />
 <img width="290" height="193" alt="изображение" src="https://github.com/user-attachments/assets/3a10c73d-6bf5-46cb-9fae-d707d95944f9" />
 <img width="208" height="303" alt="изображение" src="https://github.com/user-attachments/assets/8c53e72f-a0d4-4d41-a437-63101aa459da" />
