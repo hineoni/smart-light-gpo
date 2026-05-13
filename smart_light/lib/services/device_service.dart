@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import '../models/device_model.dart';
+import '../models/device_distance_model.dart';
 
 class DeviceService {
   static const String baseUrl =
@@ -179,6 +180,24 @@ class DeviceService {
       } else {
         throw Exception('Failed to load online devices');
       }
+    } catch (e) {
+      return [];
+    }
+  }
+
+  static Future<List<DeviceDistanceModel>> getDistances() async {
+    try {
+      final response = await http
+          .get(Uri.parse('$baseUrl/devices/distances'))
+          .timeout(const Duration(seconds: 5));
+
+      if (response.statusCode == 200) {
+        final List<Map<String, dynamic>> data =
+            (json.decode(response.body) as List).cast<Map<String, dynamic>>();
+        return data.map((json) => DeviceDistanceModel.fromJson(json)).toList();
+      }
+
+      throw Exception('Failed to load distances');
     } catch (e) {
       return [];
     }
