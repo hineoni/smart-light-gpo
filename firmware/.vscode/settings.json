@@ -4,5 +4,8 @@
     "idf.espIdfPathWin": "c:\\Work\\pet-projects\\smart-light\\soft\\ESP-IDF\\esp-idf-v5.5.1\\tools\\v5.5.1\\esp-idf",
     "idf.toolsPathWin": "c:\\Work\\pet-projects\\smart-light\\soft",
     "idf.pythonInstallPath": "/opt/homebrew/bin/python3",
+    "idf.espIdfPath": "/Users/viktoriabazanova/esp/v5.5.1/esp-idf",
+    "idf.toolsPath": "/Users/viktoriabazanova/.espressif",
+    "idf.customExtraPaths": "/Users/viktoriabazanova/.espressif/tools/xtensa-esp-elf/esp-14.2.0_20241119/xtensa-esp-elf/bin:/Users/viktoriabazanova/.espressif/tools/cmake/3.30.2/CMake.app/Contents/bin:/Users/viktoriabazanova/.espressif/tools/ninja/1.12.1",
     "idf.port": "/dev/tty.usbserial-0001"
 }
