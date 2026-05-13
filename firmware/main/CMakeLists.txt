@@ -8,6 +8,7 @@ idf_component_register(
         wifi_manager
         servo_controller
         led_controller
+        uwb_positioning
         web_server
         websocket_client
         esp_wifi

@@ -1,6 +1,7 @@
 #include "websocket_client.h"
 #include "servo_controller.h"
 #include "led_controller.h"
+#include "uwb_positioning.h"
 #include "cJSON.h"
 #include "esp_log.h"
 #include "freertos/FreeRTOS.h"
@@ -424,6 +425,32 @@ esp_err_t websocket_client_send_heartbeat(void)
     }
     cJSON_AddNumberToObject(servo2, "angle", status.angle2);
     cJSON_AddItemToObject(heartbeat_json, "servo2", servo2);
+
+    cJSON* uwb = cJSON_CreateObject();
+    cJSON* ranges = cJSON_CreateArray();
+    if (uwb != NULL && ranges != NULL) {
+        uwb_range_t current_ranges[UWB_MAX_RANGES];
+        size_t range_count = uwb_positioning_get_ranges(current_ranges, UWB_MAX_RANGES);
+
+        for (size_t i = 0; i < range_count; i++) {
+            cJSON* range = cJSON_CreateObject();
+            if (range == NULL) {
+                continue;
+            }
+
+            cJSON_AddStringToObject(range, "peerId", current_ranges[i].peer_id);
+            cJSON_AddNumberToObject(range, "distanceM", current_ranges[i].distance_m);
+            cJSON_AddNumberToObject(range, "updatedAtMs", current_ranges[i].updated_at_ms);
+            cJSON_AddItemToArray(ranges, range);
+        }
+
+        cJSON_AddItemToObject(uwb, "ranges", ranges);
+        cJSON_AddBoolToObject(uwb, "ready", uwb_positioning_is_ready());
+        cJSON_AddItemToObject(heartbeat_json, "uwb", uwb);
+    } else {
+        if (uwb != NULL) cJSON_Delete(uwb);
+        if (ranges != NULL) cJSON_Delete(ranges);
+    }
     
     ESP_LOGD(TAG, "Sending heartbeat with servo1=%d, servo2=%d", status.angle1, status.angle2);
     
