@@ -21,6 +21,7 @@
 #include "web_server.h"
 #include "websocket_client.h"
 #include "driver/gpio.h"
+#include "driver/uart.h"
 
 #define RESET_BUTTON_PIN GPIO_NUM_0  // GPIO0 - кнопка BOOT на большинстве ESP32
 
@@ -285,9 +286,10 @@ static esp_err_t init_system(void)
     // Инициализация UWB-модуля расположения
     ESP_LOGI(TAG, "Initializing UWB positioning module...");
     uwb_positioning_config_t uwb_config = {
-        .sdo_pin = 19,
-        .sck_pin = 18,
-        .rst_pin = 27
+        .uart_num = UART_NUM_1,
+        .tx_pin = 18,
+        .rx_pin = 19,
+        .baud_rate = 115200,
     };
     ret = uwb_positioning_init(&uwb_config);
     if (ret != ESP_OK) {

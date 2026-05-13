@@ -19,9 +19,10 @@ typedef struct {
 } uwb_range_t;
 
 typedef struct {
-    int sdo_pin;
-    int sck_pin;
-    int rst_pin;
+    int uart_num;
+    int tx_pin;
+    int rx_pin;
+    int baud_rate;
 } uwb_positioning_config_t;
 
 esp_err_t uwb_positioning_init(const uwb_positioning_config_t *config);
