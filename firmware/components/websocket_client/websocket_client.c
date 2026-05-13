@@ -9,7 +9,7 @@
 #include <string.h>
 #include <stdio.h>
 
-#define HEARTBEAT_INTERVAL_MS 15000  // 15 секунд между heartbeat сообщениями (было 5)
+#define HEARTBEAT_INTERVAL_MS 1000
 
 static const char *TAG = "WS_CLIENT";
 
@@ -441,11 +441,13 @@ esp_err_t websocket_client_send_heartbeat(void)
             cJSON_AddStringToObject(range, "peerId", current_ranges[i].peer_id);
             cJSON_AddNumberToObject(range, "distanceM", current_ranges[i].distance_m);
             cJSON_AddNumberToObject(range, "updatedAtMs", current_ranges[i].updated_at_ms);
+            cJSON_AddNumberToObject(range, "rssiDbm", current_ranges[i].rssi_dbm);
             cJSON_AddItemToArray(ranges, range);
         }
 
         cJSON_AddItemToObject(uwb, "ranges", ranges);
         cJSON_AddBoolToObject(uwb, "ready", uwb_positioning_is_ready());
+        cJSON_AddNumberToObject(uwb, "rangeCount", range_count);
         cJSON_AddItemToObject(heartbeat_json, "uwb", uwb);
     } else {
         if (uwb != NULL) cJSON_Delete(uwb);
