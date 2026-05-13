@@ -17,6 +17,7 @@
 #include "wifi_manager.h"
 #include "servo_controller.h"
 #include "led_controller.h"
+#include "uwb_positioning.h"
 #include "web_server.h"
 #include "websocket_client.h"
 #include "driver/gpio.h"
@@ -104,6 +105,9 @@ static void periodic_task(void *pvParameters)
     while (1) {
         // Обновление сервоприводов для плавного движения
         servo_controller_task();
+
+        // Диагностика/обновление UWB-модуля
+        uwb_positioning_task();
         
         // Отправка heartbeat сообщений через WebSocket
         if (g_websocket_started && websocket_client_is_connected()) {
@@ -275,6 +279,19 @@ static esp_err_t init_system(void)
     ret = led_controller_init(&led_config);
     if (ret != ESP_OK) {
         ESP_LOGE(TAG, "Failed to initialize LED controller: %s", esp_err_to_name(ret));
+        return ret;
+    }
+
+    // Инициализация UWB-модуля расположения
+    ESP_LOGI(TAG, "Initializing UWB positioning module...");
+    uwb_positioning_config_t uwb_config = {
+        .sdo_pin = 19,
+        .sck_pin = 18,
+        .rst_pin = 27
+    };
+    ret = uwb_positioning_init(&uwb_config);
+    if (ret != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to initialize UWB positioning: %s", esp_err_to_name(ret));
         return ret;
     }
     
