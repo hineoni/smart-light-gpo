@@ -203,6 +203,24 @@ class DeviceService {
     }
   }
 
+  static Future<PositioningSummaryModel> getPositioningSummary() async {
+    try {
+      final response = await http
+          .get(Uri.parse('$baseUrl/devices/distances/summary'))
+          .timeout(const Duration(seconds: 5));
+
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body) as Map<String, dynamic>;
+        return PositioningSummaryModel.fromJson(data);
+      }
+
+      throw Exception('Failed to load positioning summary');
+    } catch (e) {
+      final distances = await getDistances();
+      return PositioningSummaryModel.fromDistances(distances);
+    }
+  }
+
   // Проверка статуса устройства через online роут
   static Future<bool> checkDeviceStatus(String deviceId) async {
     try {
