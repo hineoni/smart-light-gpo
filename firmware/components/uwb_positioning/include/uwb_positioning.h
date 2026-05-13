@@ -2,6 +2,7 @@
 
 #include "esp_err.h"
 #include <stdbool.h>
+#include <stdint.h>
 #include <stddef.h>
 
 #ifdef __cplusplus
@@ -14,6 +15,7 @@ extern "C" {
 typedef struct {
     char peer_id[UWB_PEER_ID_LEN];
     float distance_m;
+    int rssi_dbm;
     int64_t updated_at_ms;
     bool valid;
 } uwb_range_t;

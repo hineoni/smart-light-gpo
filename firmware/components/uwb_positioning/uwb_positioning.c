@@ -8,10 +8,15 @@
 #include <stdlib.h>
 #include <string.h>
 
-#define UWB_DIAGNOSTIC_INTERVAL_MS 1000
 #define UWB_RX_BUFFER_SIZE 1024
 #define UWB_LINE_BUFFER_SIZE 128
 #define UWB_MAX_LINES_PER_POLL 8
+#define UWB_FRAME_SIZE 8
+#define UWB_FRAME_HEADER 0xF0
+#define UWB_FRAME_PAYLOAD_LEN 0x05
+#define UWB_FRAME_TAIL 0xAA
+#define UWB_STALE_AFTER_MS 5000
+#define UWB_LOG_INTERVAL_MS 1000
 
 static const char *TAG = "UWB_POSITIONING";
 
@@ -23,10 +28,12 @@ static uwb_positioning_config_t s_config = {
 };
 
 static bool s_ready = false;
-static int64_t s_last_diag_ms = 0;
+static int64_t s_last_log_ms = 0;
 static uwb_range_t s_ranges[UWB_MAX_RANGES] = {0};
 static char s_line_buffer[UWB_LINE_BUFFER_SIZE];
 static size_t s_line_length = 0;
+static uint8_t s_frame_buffer[UWB_FRAME_SIZE];
+static size_t s_frame_length = 0;
 
 static int64_t now_ms(void)
 {
@@ -61,12 +68,38 @@ static bool parse_range_line(const char *line, uwb_range_t *range)
         memset(range, 0, sizeof(*range));
         snprintf(range->peer_id, sizeof(range->peer_id), "%s", peer_id);
         range->distance_m = distance_m;
+        range->rssi_dbm = 0;
         range->updated_at_ms = now_ms();
         range->valid = true;
         return true;
     }
 
     return false;
+}
+
+static bool parse_mk8000_frame(const uint8_t *frame, uwb_range_t *range)
+{
+    if (frame[0] != UWB_FRAME_HEADER ||
+        frame[1] != UWB_FRAME_PAYLOAD_LEN ||
+        frame[7] != UWB_FRAME_TAIL) {
+        return false;
+    }
+
+    uint16_t peer_addr = (uint16_t)frame[2] | ((uint16_t)frame[3] << 8);
+    uint16_t distance_cm = (uint16_t)frame[4] | ((uint16_t)frame[5] << 8);
+    int rssi_dbm = (int)frame[6] - 256;
+
+    if (peer_addr == 0 || distance_cm > 10000) {
+        return false;
+    }
+
+    memset(range, 0, sizeof(*range));
+    snprintf(range->peer_id, sizeof(range->peer_id), "uwb_%04X", peer_addr);
+    range->distance_m = (float)distance_cm / 100.0f;
+    range->rssi_dbm = rssi_dbm;
+    range->updated_at_ms = now_ms();
+    range->valid = true;
+    return true;
 }
 
 static void upsert_range(const uwb_range_t *range)
@@ -98,6 +131,35 @@ static void upsert_range(const uwb_range_t *range)
     s_ranges[oldest_index] = *range;
 }
 
+static bool should_log_now(void)
+{
+    int64_t current_ms = now_ms();
+    if ((current_ms - s_last_log_ms) < UWB_LOG_INTERVAL_MS) {
+        return false;
+    }
+
+    s_last_log_ms = current_ms;
+    return true;
+}
+
+static void process_mk8000_frame(const uint8_t *frame)
+{
+    uwb_range_t range;
+    if (parse_mk8000_frame(frame, &range)) {
+        upsert_range(&range);
+        ESP_LOGI(TAG, "Parsed MK8000 range: peer=%s distance=%.2fm rssi=%ddBm",
+                 range.peer_id, (double)range.distance_m, range.rssi_dbm);
+        return;
+    }
+
+    if (should_log_now()) {
+        ESP_LOGW(TAG,
+                 "Invalid MK8000 frame: %02X %02X %02X %02X %02X %02X %02X %02X",
+                 frame[0], frame[1], frame[2], frame[3],
+                 frame[4], frame[5], frame[6], frame[7]);
+    }
+}
+
 static void process_uart_line(char *line)
 {
     trim_line(line);
@@ -116,6 +178,54 @@ static void process_uart_line(char *line)
     }
 
     ESP_LOGW(TAG, "UWB line format is not recognized yet");
+}
+
+static void process_rx_byte(uint8_t byte, int *processed_lines)
+{
+    if (s_frame_length == 0) {
+        if (byte == UWB_FRAME_HEADER) {
+            s_frame_buffer[s_frame_length++] = byte;
+            return;
+        }
+    } else {
+        s_frame_buffer[s_frame_length++] = byte;
+
+        if (s_frame_length == 2 && s_frame_buffer[1] != UWB_FRAME_PAYLOAD_LEN) {
+            if (should_log_now()) {
+                ESP_LOGW(TAG, "Dropping MK8000 frame with unexpected length byte: 0x%02X", s_frame_buffer[1]);
+            }
+            s_frame_length = 0;
+            return;
+        }
+
+        if (s_frame_length == UWB_FRAME_SIZE) {
+            process_mk8000_frame(s_frame_buffer);
+            s_frame_length = 0;
+        }
+
+        return;
+    }
+
+    char c = (char)byte;
+    if (c == '\n' || c == '\r') {
+        if (s_line_length > 0) {
+            s_line_buffer[s_line_length] = '\0';
+            process_uart_line(s_line_buffer);
+            s_line_length = 0;
+            (*processed_lines)++;
+        }
+        return;
+    }
+
+    if (c >= 32 && c <= 126) {
+        if (s_line_length < (sizeof(s_line_buffer) - 1)) {
+            s_line_buffer[s_line_length++] = c;
+        } else {
+            s_line_buffer[sizeof(s_line_buffer) - 1] = '\0';
+            ESP_LOGW(TAG, "Dropping overlong UWB UART line: %s", s_line_buffer);
+            s_line_length = 0;
+        }
+    }
 }
 
 esp_err_t uwb_positioning_init(const uwb_positioning_config_t *config)
@@ -157,12 +267,15 @@ esp_err_t uwb_positioning_init(const uwb_positioning_config_t *config)
     memset(s_ranges, 0, sizeof(s_ranges));
     memset(s_line_buffer, 0, sizeof(s_line_buffer));
     s_line_length = 0;
-    s_last_diag_ms = now_ms();
+    memset(s_frame_buffer, 0, sizeof(s_frame_buffer));
+    s_frame_length = 0;
+    s_last_log_ms = now_ms();
     s_ready = true;
 
     ESP_LOGI(TAG, "Initialized UWB UART: uart=%d tx=GPIO%d rx=GPIO%d baud=%d",
              s_config.uart_num, s_config.tx_pin, s_config.rx_pin, s_config.baud_rate);
-    ESP_LOGW(TAG, "Expecting text lines like 'DIST,<peer>,<meters>' or '<peer>,<meters>'");
+    ESP_LOGI(TAG, "Expecting MK8000 binary frames: F0 05 <addr_lo> <addr_hi> <dist_lo> <dist_hi> <rssi> AA");
+    ESP_LOGI(TAG, "Diagnostic text lines like 'DIST,<peer>,<meters>' remain supported");
 
     return ESP_OK;
 }
@@ -170,11 +283,6 @@ esp_err_t uwb_positioning_init(const uwb_positioning_config_t *config)
 void uwb_positioning_task(void)
 {
     if (!s_ready) {
-        return;
-    }
-
-    int64_t current_ms = now_ms();
-    if ((current_ms - s_last_diag_ms) < UWB_DIAGNOSTIC_INTERVAL_MS) {
         return;
     }
 
@@ -188,28 +296,9 @@ void uwb_positioning_task(void)
         }
 
         for (int i = 0; i < bytes_read; i++) {
-            char c = (char)rx_buffer[i];
-            if (c == '\n' || c == '\r') {
-                if (s_line_length > 0) {
-                    s_line_buffer[s_line_length] = '\0';
-                    process_uart_line(s_line_buffer);
-                    s_line_length = 0;
-                    processed_lines++;
-                }
-                continue;
-            }
-
-            if (s_line_length < (sizeof(s_line_buffer) - 1)) {
-                s_line_buffer[s_line_length++] = c;
-            } else {
-                s_line_buffer[sizeof(s_line_buffer) - 1] = '\0';
-                ESP_LOGW(TAG, "Dropping overlong UWB UART line: %s", s_line_buffer);
-                s_line_length = 0;
-            }
+            process_rx_byte(rx_buffer[i], &processed_lines);
         }
     }
-
-    s_last_diag_ms = current_ms;
 }
 
 size_t uwb_positioning_get_ranges(uwb_range_t *ranges, size_t max_ranges)
@@ -219,8 +308,9 @@ size_t uwb_positioning_get_ranges(uwb_range_t *ranges, size_t max_ranges)
     }
 
     size_t count = 0;
+    int64_t current_ms = now_ms();
     for (size_t i = 0; i < UWB_MAX_RANGES && count < max_ranges; i++) {
-        if (s_ranges[i].valid) {
+        if (s_ranges[i].valid && (current_ms - s_ranges[i].updated_at_ms) <= UWB_STALE_AFTER_MS) {
             ranges[count++] = s_ranges[i];
         }
     }
