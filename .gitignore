@@ -17,4 +17,5 @@ frontend/pubspec.lock
 *.log
 soft
 build
-
+firmware/build-idf6/
+firmware/managed_components/

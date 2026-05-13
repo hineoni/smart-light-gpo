@@ -4,7 +4,7 @@ idf_component_register(
     REQUIRES 
         esp_wifi
         protocomm
-        wifi_provisioning
+        network_provisioning
         config_storage
         log
         esp_timer

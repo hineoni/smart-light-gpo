@@ -15,6 +15,8 @@ idf_component_register(
         esp_http_server
         nvs_flash
         driver
-        json
+        esp_driver_gpio
+        esp_driver_uart
+        cjson
         spiffs
 )
