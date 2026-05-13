@@ -10,7 +10,8 @@ interface HeartbeatMsg extends IncomingBase {
   servo2?: { angle: number };
   uwb?: {
     ready?: boolean;
-    ranges?: Array<{ peerId: string; distanceM: number; updatedAtMs?: number }>;
+    rangeCount?: number;
+    ranges?: Array<{ peerId: string; distanceM: number; updatedAtMs?: number; rssiDbm?: number }>;
   };
 }
 
