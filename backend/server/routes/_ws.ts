@@ -1,9 +1,18 @@
 import { getDevice, updateDeviceStatus, autoRegisterDevice } from '~/utils/deviceStorage';
 import { registerPeer, unregisterPeer, updateHeartbeat } from '~/utils/wsRuntime';
+import { updateDeviceRanges } from '~/utils/positioningRuntime';
 
 interface IncomingBase { type: string; }
 interface RegisterMsg extends IncomingBase { type: 'register'; deviceId: string; }
-interface HeartbeatMsg extends IncomingBase { type: 'heartbeat'; servo1?: { angle: number }; servo2?: { angle: number }; }
+interface HeartbeatMsg extends IncomingBase {
+  type: 'heartbeat';
+  servo1?: { angle: number };
+  servo2?: { angle: number };
+  uwb?: {
+    ready?: boolean;
+    ranges?: Array<{ peerId: string; distanceM: number; updatedAtMs?: number }>;
+  };
+}
 
 type IncomingMessage = RegisterMsg | HeartbeatMsg | any;
 
@@ -44,7 +53,10 @@ export default defineWebSocketHandler({
 
     if (payload.type === 'heartbeat') {
       const rt = updateHeartbeat(peer.id, payload.servo1?.angle, payload.servo2?.angle);
-      if (rt?.deviceId) updateDeviceStatus(rt.deviceId, 'connected');
+      if (rt?.deviceId) {
+        updateDeviceStatus(rt.deviceId, 'connected');
+        updateDeviceRanges(rt.deviceId, payload.uwb?.ranges);
+      }
       peer.send(JSON.stringify({ type: 'ack', action: 'heartbeat' }));
       return;
     }
