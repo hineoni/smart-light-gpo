@@ -9,7 +9,7 @@
 #include <string.h>
 #include <stdio.h>
 
-#define HEARTBEAT_INTERVAL_MS 1000
+#define WS_HEARTBEAT_INTERVAL_MS 1000
 
 static const char *TAG = "WS_CLIENT";
 
@@ -488,8 +488,8 @@ void websocket_client_heartbeat_task(void)
 {
     TickType_t current_time = xTaskGetTickCount();
     
-    // Отправляем heartbeat каждые HEARTBEAT_INTERVAL_MS миллисекунд
-    if ((current_time - s_last_heartbeat) >= pdMS_TO_TICKS(HEARTBEAT_INTERVAL_MS)) {
+    // Отправляем heartbeat каждые WS_HEARTBEAT_INTERVAL_MS миллисекунд
+    if ((current_time - s_last_heartbeat) >= pdMS_TO_TICKS(WS_HEARTBEAT_INTERVAL_MS)) {
         if (s_is_connected) {
             websocket_client_send_heartbeat();
         }
