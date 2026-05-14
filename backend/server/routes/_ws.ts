@@ -6,17 +6,20 @@ interface IncomingBase { type: string; }
 interface RegisterMsg extends IncomingBase { type: 'register'; deviceId: string; }
 interface HeartbeatMsg extends IncomingBase {
   type: 'heartbeat';
+  deviceId?: string;
   servo1?: { angle: number };
   servo2?: { angle: number };
   uwb?: {
     ready?: boolean;
     rangeCount?: number;
     uartBytes?: number;
+    discardedBytes?: number;
     parsedFrames?: number;
     invalidFrames?: number;
     parsedLines?: number;
     invalidLines?: number;
     lastByteAtMs?: number;
+    lastRxHex?: string;
     ranges?: Array<{ peerId: string; distanceM: number; updatedAtMs?: number; rssiDbm?: number }>;
   };
 }
@@ -78,7 +81,15 @@ export default defineWebSocketHandler({
     }
 
     if (payload.type === 'heartbeat') {
-      const rt = updateHeartbeat(peer.id, payload.servo1?.angle, payload.servo2?.angle, payload.uwb);
+      let rt = updateHeartbeat(peer.id, payload.servo1?.angle, payload.servo2?.angle, payload.uwb);
+      if (!rt?.deviceId && typeof payload.deviceId === 'string' && payload.deviceId.length > 0) {
+        if (!getDevice(payload.deviceId)) {
+          const clientIP = peer.request?.socket?.remoteAddress || 'unknown';
+          autoRegisterDevice(payload.deviceId, clientIP);
+        }
+        registerPeer(payload.deviceId, peer);
+        rt = updateHeartbeat(peer.id, payload.servo1?.angle, payload.servo2?.angle, payload.uwb);
+      }
       if (rt?.deviceId) {
         updateDeviceStatus(rt.deviceId, 'connected');
         updateDeviceUwbStatus(rt.deviceId, payload.uwb?.ready, payload.uwb?.rangeCount, payload.uwb);

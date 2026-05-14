@@ -14,11 +14,13 @@ export default defineEventHandler(() => {
       uwbReady: d.uwbReady,
       uwbRangeCount: d.uwbRangeCount,
       uwbUartBytes: d.uwbUartBytes,
+      uwbDiscardedBytes: d.uwbDiscardedBytes,
       uwbParsedFrames: d.uwbParsedFrames,
       uwbInvalidFrames: d.uwbInvalidFrames,
       uwbParsedLines: d.uwbParsedLines,
       uwbInvalidLines: d.uwbInvalidLines,
       uwbLastByteAtMs: d.uwbLastByteAtMs,
+      uwbLastRxHex: d.uwbLastRxHex,
     };
   });
   return list;

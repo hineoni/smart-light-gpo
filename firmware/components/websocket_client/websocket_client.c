@@ -406,8 +406,9 @@ esp_err_t websocket_client_send_heartbeat(void)
         ESP_LOGE(TAG, "Failed to create heartbeat JSON object - out of memory?");
         return ESP_ERR_NO_MEM;
     }
-    
+
     cJSON_AddStringToObject(heartbeat_json, "type", "heartbeat");
+    cJSON_AddStringToObject(heartbeat_json, "deviceId", s_device_config.device_id);
     
     cJSON* servo1 = cJSON_CreateObject();
     if (servo1 == NULL) {
@@ -452,11 +453,13 @@ esp_err_t websocket_client_send_heartbeat(void)
         cJSON_AddBoolToObject(uwb, "ready", uwb_positioning_is_ready());
         cJSON_AddNumberToObject(uwb, "rangeCount", range_count);
         cJSON_AddNumberToObject(uwb, "uartBytes", uwb_stats.total_bytes);
+        cJSON_AddNumberToObject(uwb, "discardedBytes", uwb_stats.discarded_bytes);
         cJSON_AddNumberToObject(uwb, "parsedFrames", uwb_stats.parsed_frames);
         cJSON_AddNumberToObject(uwb, "invalidFrames", uwb_stats.invalid_frames);
         cJSON_AddNumberToObject(uwb, "parsedLines", uwb_stats.parsed_lines);
         cJSON_AddNumberToObject(uwb, "invalidLines", uwb_stats.invalid_lines);
         cJSON_AddNumberToObject(uwb, "lastByteAtMs", uwb_stats.last_byte_at_ms);
+        cJSON_AddStringToObject(uwb, "lastRxHex", uwb_stats.last_rx_hex);
         cJSON_AddItemToObject(heartbeat_json, "uwb", uwb);
     } else {
         if (uwb != NULL) cJSON_Delete(uwb);

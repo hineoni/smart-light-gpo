@@ -22,11 +22,13 @@ export interface PositioningNode {
   uwbReady?: boolean;
   uwbRangeCount?: number;
   uwbUartBytes?: number;
+  uwbDiscardedBytes?: number;
   uwbParsedFrames?: number;
   uwbInvalidFrames?: number;
   uwbParsedLines?: number;
   uwbInvalidLines?: number;
   uwbLastByteAtMs?: number;
+  uwbLastRxHex?: string;
 }
 
 export interface PositioningSummary {
@@ -99,11 +101,13 @@ interface OnlineNodeInput {
   uwbReady?: boolean;
   uwbRangeCount?: number;
   uwbUartBytes?: number;
+  uwbDiscardedBytes?: number;
   uwbParsedFrames?: number;
   uwbInvalidFrames?: number;
   uwbParsedLines?: number;
   uwbInvalidLines?: number;
   uwbLastByteAtMs?: number;
+  uwbLastRxHex?: string;
 }
 
 export function getPositioningSummary(onlineNodes: Array<string | OnlineNodeInput> = []): PositioningSummary {
@@ -146,11 +150,13 @@ export function getPositioningSummary(onlineNodes: Array<string | OnlineNodeInpu
           uwbReady: onlineNode?.uwbReady,
           uwbRangeCount: onlineNode?.uwbRangeCount,
           uwbUartBytes: onlineNode?.uwbUartBytes,
+          uwbDiscardedBytes: onlineNode?.uwbDiscardedBytes,
           uwbParsedFrames: onlineNode?.uwbParsedFrames,
           uwbInvalidFrames: onlineNode?.uwbInvalidFrames,
           uwbParsedLines: onlineNode?.uwbParsedLines,
           uwbInvalidLines: onlineNode?.uwbInvalidLines,
           uwbLastByteAtMs: onlineNode?.uwbLastByteAtMs,
+          uwbLastRxHex: onlineNode?.uwbLastRxHex,
         };
       }),
     lastUpdated,

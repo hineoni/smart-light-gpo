@@ -7,11 +7,13 @@ interface RuntimeEntry {
   uwbReady?: boolean;
   uwbRangeCount?: number;
   uwbUartBytes?: number;
+  uwbDiscardedBytes?: number;
   uwbParsedFrames?: number;
   uwbInvalidFrames?: number;
   uwbParsedLines?: number;
   uwbInvalidLines?: number;
   uwbLastByteAtMs?: number;
+  uwbLastRxHex?: string;
 }
 
 const runtime: Map<string, RuntimeEntry> = new Map(); // key: peer.id
@@ -32,11 +34,13 @@ export function updateHeartbeat(
     ready?: boolean;
     rangeCount?: number;
     uartBytes?: number;
+    discardedBytes?: number;
     parsedFrames?: number;
     invalidFrames?: number;
     parsedLines?: number;
     invalidLines?: number;
     lastByteAtMs?: number;
+    lastRxHex?: string;
   }
 ) {
   const entry = runtime.get(peerId);
@@ -47,11 +51,13 @@ export function updateHeartbeat(
   if (typeof uwb?.ready === 'boolean') entry.uwbReady = uwb.ready;
   if (typeof uwb?.rangeCount === 'number') entry.uwbRangeCount = uwb.rangeCount;
   if (typeof uwb?.uartBytes === 'number') entry.uwbUartBytes = uwb.uartBytes;
+  if (typeof uwb?.discardedBytes === 'number') entry.uwbDiscardedBytes = uwb.discardedBytes;
   if (typeof uwb?.parsedFrames === 'number') entry.uwbParsedFrames = uwb.parsedFrames;
   if (typeof uwb?.invalidFrames === 'number') entry.uwbInvalidFrames = uwb.invalidFrames;
   if (typeof uwb?.parsedLines === 'number') entry.uwbParsedLines = uwb.parsedLines;
   if (typeof uwb?.invalidLines === 'number') entry.uwbInvalidLines = uwb.invalidLines;
   if (typeof uwb?.lastByteAtMs === 'number') entry.uwbLastByteAtMs = uwb.lastByteAtMs;
+  if (typeof uwb?.lastRxHex === 'string') entry.uwbLastRxHex = uwb.lastRxHex;
   return entry;
 }
 
@@ -70,11 +76,13 @@ export function onlineDevices(): Array<{
   uwbReady?: boolean;
   uwbRangeCount?: number;
   uwbUartBytes?: number;
+  uwbDiscardedBytes?: number;
   uwbParsedFrames?: number;
   uwbInvalidFrames?: number;
   uwbParsedLines?: number;
   uwbInvalidLines?: number;
   uwbLastByteAtMs?: number;
+  uwbLastRxHex?: string;
 }> {
   const now = Date.now();
   return Array.from(runtime.values())
@@ -87,11 +95,13 @@ export function onlineDevices(): Array<{
       uwbReady: e.uwbReady,
       uwbRangeCount: e.uwbRangeCount,
       uwbUartBytes: e.uwbUartBytes,
+      uwbDiscardedBytes: e.uwbDiscardedBytes,
       uwbParsedFrames: e.uwbParsedFrames,
       uwbInvalidFrames: e.uwbInvalidFrames,
       uwbParsedLines: e.uwbParsedLines,
       uwbInvalidLines: e.uwbInvalidLines,
       uwbLastByteAtMs: e.uwbLastByteAtMs,
+      uwbLastRxHex: e.uwbLastRxHex,
     }));
 }
 
