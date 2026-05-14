@@ -220,3 +220,66 @@ export function applyScene(sceneId: string) {
   return { sceneId, results };
 }
 
+function fallbackPose(deviceId: string) {
+  const devices = getDevices();
+  const index = Math.max(0, devices.findIndex(device => device.id === deviceId));
+  const count = Math.max(1, devices.length);
+  return {
+    x: count <= 1 ? 0.5 : 0.2 + (0.6 * index) / Math.max(1, count - 1),
+    y: 0.5,
+    heightM: 1.4,
+  };
+}
+
+function devicePose(deviceId: string) {
+  const assignedZoneId = deviceZoneIds.get(deviceId);
+  const zone = assignedZoneId ? zones.get(assignedZoneId) : undefined;
+  return {
+    zoneId: assignedZoneId,
+    x: zone?.x ?? fallbackPose(deviceId).x,
+    y: zone?.y ?? fallbackPose(deviceId).y,
+    heightM: zone?.heightM ?? fallbackPose(deviceId).heightM,
+  };
+}
+
+function clampServo(value: number) {
+  return Math.min(180, Math.max(0, Math.round(value)));
+}
+
+export function aimDeviceAtTarget(sourceDeviceId: string, targetDeviceId: string) {
+  const source = getDevice(sourceDeviceId);
+  const target = getDevice(targetDeviceId);
+  if (!source) {
+    throw new Error(`Source device ${sourceDeviceId} not found`);
+  }
+  if (!target) {
+    throw new Error(`Target device ${targetDeviceId} not found`);
+  }
+
+  ensureDefaultZones();
+  const sourcePose = devicePose(sourceDeviceId);
+  const targetPose = devicePose(targetDeviceId);
+  const dx = targetPose.x - sourcePose.x;
+  const dy = targetPose.y - sourcePose.y;
+  const dz = targetPose.heightM - sourcePose.heightM;
+  const horizontalDistance = Math.max(0.01, Math.hypot(dx, dy));
+  const bearingDeg = (Math.atan2(dy, dx) * 180) / Math.PI;
+  const elevationDeg = (Math.atan2(dz, horizontalDistance) * 180) / Math.PI;
+  const servo1Angle = clampServo(90 + bearingDeg / 2);
+  const servo2Angle = clampServo(90 - elevationDeg);
+
+  const servo1Sent = sendServoCommand(sourceDeviceId, 1, servo1Angle);
+  const servo2Sent = sendServoCommand(sourceDeviceId, 2, servo2Angle);
+  updateDeviceAngles(sourceDeviceId, servo1Angle, servo2Angle);
+
+  return {
+    sourceDeviceId,
+    targetDeviceId,
+    servo1Angle,
+    servo2Angle,
+    servo1Sent,
+    servo2Sent,
+    sourcePose,
+    targetPose,
+  };
+}
