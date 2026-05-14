@@ -2,6 +2,7 @@
 backend/node_modules/
 backend/.nitro/
 backend/.output/
+backend/.data/
 backend/dist/
 backend/npm-debug.log
 
