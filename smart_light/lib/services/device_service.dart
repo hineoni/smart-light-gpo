@@ -309,6 +309,25 @@ class DeviceService {
     }
   }
 
+  static Future<bool> aimDeviceAtTarget(
+    String sourceDeviceId,
+    String targetDeviceId,
+  ) async {
+    try {
+      final response = await http
+          .post(
+            Uri.parse('$baseUrl/devices/$sourceDeviceId/aim'),
+            headers: {'Content-Type': 'application/json'},
+            body: json.encode({'targetDeviceId': targetDeviceId}),
+          )
+          .timeout(const Duration(seconds: 5));
+      return response.statusCode == 200;
+    } catch (e) {
+      print('[DEVICE_SERVICE] Error aiming device: $e');
+      return false;
+    }
+  }
+
   // Проверка статуса устройства через online роут
   static Future<bool> checkDeviceStatus(String deviceId) async {
     try {
