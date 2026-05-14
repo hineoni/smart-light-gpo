@@ -1,3 +1,5 @@
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
 import { getDevices, getDevice, updateDeviceAngles, updateDeviceLed } from './deviceStorage';
 import { getPositioningSummary } from './positioningRuntime';
 import { onlineDevices, sendServoCommand, sendToDevice } from './wsRuntime';
@@ -40,6 +42,52 @@ export interface LightScene {
 const zones = new Map<string, RoomZone>();
 const scenes = new Map<string, LightScene>();
 const deviceZoneIds = new Map<string, string>();
+const stateFilePath = join(process.cwd(), '.data', 'scene-state.json');
+let stateLoaded = false;
+
+interface PersistedSceneState {
+  zones?: RoomZone[];
+  scenes?: LightScene[];
+  deviceZoneIds?: Array<[string, string]>;
+}
+
+function loadState() {
+  if (stateLoaded) return;
+  stateLoaded = true;
+
+  if (!existsSync(stateFilePath)) return;
+
+  try {
+    const state = JSON.parse(readFileSync(stateFilePath, 'utf8')) as PersistedSceneState;
+    for (const zone of state.zones ?? []) {
+      zones.set(zone.id, zone);
+    }
+    for (const scene of state.scenes ?? []) {
+      scenes.set(scene.id, scene);
+    }
+    for (const [deviceId, zoneId] of state.deviceZoneIds ?? []) {
+      deviceZoneIds.set(deviceId, zoneId);
+    }
+  } catch (error) {
+    console.warn('[sceneRuntime] failed to load scene state:', error);
+  }
+}
+
+function saveState() {
+  try {
+    mkdirSync(dirname(stateFilePath), { recursive: true });
+    writeFileSync(
+      stateFilePath,
+      JSON.stringify({
+        zones: Array.from(zones.values()),
+        scenes: Array.from(scenes.values()),
+        deviceZoneIds: Array.from(deviceZoneIds.entries()),
+      } satisfies PersistedSceneState, null, 2)
+    );
+  } catch (error) {
+    console.warn('[sceneRuntime] failed to save scene state:', error);
+  }
+}
 
 function nowIso() {
   return new Date().toISOString();
@@ -55,6 +103,7 @@ function slugify(input: string) {
 }
 
 function ensureDefaultZones() {
+  loadState();
   if (zones.size > 0) return;
 
   const createdAt = nowIso();
@@ -68,6 +117,7 @@ function ensureDefaultZones() {
   for (const zone of defaults) {
     zones.set(zone.id, { ...zone, createdAt, updatedAt: createdAt });
   }
+  saveState();
 }
 
 function clamp01(value: unknown, fallback: number) {
@@ -80,6 +130,17 @@ function clampAngle(value: unknown, fallback: number) {
   return typeof value === 'number' && Number.isFinite(value)
     ? Math.min(180, Math.max(0, value))
     : fallback;
+}
+
+function clampByte(value: unknown, fallback: number) {
+  return typeof value === 'number' && Number.isFinite(value)
+    ? Math.min(255, Math.max(0, Math.round(value)))
+    : fallback;
+}
+
+function normalizeBrightness(value: unknown, fallback = 255) {
+  if (typeof value !== 'number' || !Number.isFinite(value)) return fallback;
+  return value <= 1 ? clampByte(value * 255, fallback) : clampByte(value, fallback);
 }
 
 function buildSceneDeviceStates(zoneId?: string): SceneDeviceState[] {
@@ -97,7 +158,7 @@ function buildSceneDeviceStates(zoneId?: string): SceneDeviceState[] {
     return {
       deviceId: device.id,
       zoneId: assignedZoneId,
-      brightness: device.brightness ?? 0.5,
+      brightness: normalizeBrightness(device.brightness),
       colorR: device.colorR ?? 255,
       colorG: device.colorG ?? 255,
       colorB: device.colorB ?? 255,
@@ -140,6 +201,7 @@ export function upsertZone(input: {
     updatedAt: timestamp,
   };
   zones.set(id, zone);
+  saveState();
   return zone;
 }
 
@@ -152,21 +214,26 @@ export function assignDeviceZone(deviceId: string, zoneId: string) {
     throw new Error(`Zone ${zoneId} not found`);
   }
   deviceZoneIds.set(deviceId, zoneId);
+  saveState();
   return { deviceId, zoneId };
 }
 
 export function listScenes() {
+  loadState();
   return Array.from(scenes.values()).sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
 }
 
 export function deleteScene(sceneId: string) {
-  return scenes.delete(sceneId);
+  loadState();
+  const deleted = scenes.delete(sceneId);
+  if (deleted) saveState();
+  return deleted;
 }
 
 export function saveScene(input: { name: string; zoneId?: string }) {
   ensureDefaultZones();
   const timestamp = nowIso();
-  const id = `${slugify(input.name)}-${Date.now()}`;
+  const id = `scene-${Date.now()}`;
   const scene: LightScene = {
     id,
     name: input.name.trim() || 'Сцена',
@@ -177,16 +244,19 @@ export function saveScene(input: { name: string; zoneId?: string }) {
     updatedAt: timestamp,
   };
   scenes.set(id, scene);
+  saveState();
   return scene;
 }
 
 export function applyScene(sceneId: string) {
+  loadState();
   const scene = scenes.get(sceneId);
   if (!scene) {
     throw new Error(`Scene ${sceneId} not found`);
   }
 
   const results = scene.devices.map(deviceState => {
+    const brightness = normalizeBrightness(deviceState.brightness);
     const ledColorSent = sendToDevice(deviceState.deviceId, {
       type: 'set_led_color',
       r: deviceState.colorR,
@@ -195,14 +265,14 @@ export function applyScene(sceneId: string) {
     });
     const ledBrightnessSent = sendToDevice(deviceState.deviceId, {
       type: 'set_led_brightness',
-      brightness: Math.round(deviceState.brightness * 255),
+      brightness,
     });
     const servo1Sent = sendServoCommand(deviceState.deviceId, 1, deviceState.servo1Angle);
     const servo2Sent = sendServoCommand(deviceState.deviceId, 2, deviceState.servo2Angle);
 
     updateDeviceLed(
       deviceState.deviceId,
-      Math.round(deviceState.brightness * 255),
+      brightness,
       deviceState.colorR,
       deviceState.colorG,
       deviceState.colorB
@@ -221,6 +291,7 @@ export function applyScene(sceneId: string) {
     };
   });
 
+  saveState();
   return { sceneId, results };
 }
 

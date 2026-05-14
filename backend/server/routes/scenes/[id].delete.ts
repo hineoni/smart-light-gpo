@@ -1,7 +1,7 @@
 import { deleteScene } from '~/utils/sceneRuntime';
 
 export default defineEventHandler((event) => {
-  const sceneId = getRouterParam(event, 'id');
+  const sceneId = decodeURIComponent(getRouterParam(event, 'id') ?? '');
   if (!sceneId) {
     throw createError({
       statusCode: 400,
@@ -18,4 +18,3 @@ export default defineEventHandler((event) => {
 
   return { success: true, sceneId };
 });
-
