@@ -177,6 +177,10 @@ class _PositioningScreenState extends State<PositioningScreen> {
                 ),
               ],
             ),
+            Text(
+              'Сцена сохраняет цвет, яркость, углы сервоприводов, выбранную зону и текущий снимок расположения.',
+              style: theme.textTheme.bodySmall,
+            ),
             const SizedBox(height: 12),
             if (_zones.isNotEmpty)
               DropdownButtonFormField<String>(
@@ -216,10 +220,20 @@ class _PositioningScreenState extends State<PositioningScreen> {
                   subtitle: Text(
                     '${scene.devices.length} плат${zoneName == null ? '' : ' · $zoneName'}',
                   ),
-                  trailing: IconButton(
-                    icon: const Icon(Icons.play_arrow),
-                    tooltip: 'Применить сцену',
-                    onPressed: () => _applyScene(scene.id),
+                  trailing: Wrap(
+                    spacing: 4,
+                    children: [
+                      IconButton(
+                        icon: const Icon(Icons.play_arrow),
+                        tooltip: 'Применить сцену',
+                        onPressed: () => _applyScene(scene.id),
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.delete_outline),
+                        tooltip: 'Удалить сцену',
+                        onPressed: () => _deleteScene(scene),
+                      ),
+                    ],
                   ),
                 );
               }),
@@ -342,6 +356,20 @@ class _PositioningScreenState extends State<PositioningScreen> {
                   child: const SizedBox.expand(),
                 ),
               ),
+      ),
+    );
+  }
+
+  Future<void> _deleteScene(LightSceneModel scene) async {
+    final ok = await DeviceService.deleteScene(scene.id);
+    if (!mounted) return;
+    await _loadData(showLoader: false);
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          ok ? 'Сцена "${scene.name}" удалена' : 'Не удалось удалить сцену',
+        ),
       ),
     );
   }
