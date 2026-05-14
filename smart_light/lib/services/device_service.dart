@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 import '../models/device_model.dart';
 import '../models/device_distance_model.dart';
+import '../models/light_scene_model.dart';
 
 class DeviceService {
   static const String baseUrl =
@@ -218,6 +219,93 @@ class DeviceService {
     } catch (e) {
       final distances = await getDistances();
       return PositioningSummaryModel.fromDistances(distances);
+    }
+  }
+
+  static Future<List<RoomZoneModel>> getZones() async {
+    try {
+      final response = await http
+          .get(Uri.parse('$baseUrl/zones'))
+          .timeout(const Duration(seconds: 5));
+
+      if (response.statusCode == 200) {
+        final List<Map<String, dynamic>> data =
+            (json.decode(response.body) as List).cast<Map<String, dynamic>>();
+        return data.map(RoomZoneModel.fromJson).toList();
+      }
+    } catch (e) {
+      print('[DEVICE_SERVICE] Error loading zones: $e');
+    }
+    return [];
+  }
+
+  static Future<List<LightSceneModel>> getScenes() async {
+    try {
+      final response = await http
+          .get(Uri.parse('$baseUrl/scenes'))
+          .timeout(const Duration(seconds: 5));
+
+      if (response.statusCode == 200) {
+        final List<Map<String, dynamic>> data =
+            (json.decode(response.body) as List).cast<Map<String, dynamic>>();
+        return data.map(LightSceneModel.fromJson).toList();
+      }
+    } catch (e) {
+      print('[DEVICE_SERVICE] Error loading scenes: $e');
+    }
+    return [];
+  }
+
+  static Future<LightSceneModel?> saveScene(
+    String name, {
+    String? zoneId,
+  }) async {
+    try {
+      final response = await http
+          .post(
+            Uri.parse('$baseUrl/scenes'),
+            headers: {'Content-Type': 'application/json'},
+            body: json.encode({
+              'name': name,
+              if (zoneId != null) 'zoneId': zoneId,
+            }),
+          )
+          .timeout(const Duration(seconds: 5));
+
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        return LightSceneModel.fromJson(json.decode(response.body));
+      }
+    } catch (e) {
+      print('[DEVICE_SERVICE] Error saving scene: $e');
+    }
+    return null;
+  }
+
+  static Future<bool> applyScene(String sceneId) async {
+    try {
+      final response = await http
+          .post(Uri.parse('$baseUrl/scenes/$sceneId/apply'))
+          .timeout(const Duration(seconds: 5));
+      return response.statusCode == 200;
+    } catch (e) {
+      print('[DEVICE_SERVICE] Error applying scene: $e');
+      return false;
+    }
+  }
+
+  static Future<bool> assignDeviceZone(String deviceId, String zoneId) async {
+    try {
+      final response = await http
+          .post(
+            Uri.parse('$baseUrl/devices/$deviceId/zone'),
+            headers: {'Content-Type': 'application/json'},
+            body: json.encode({'zoneId': zoneId}),
+          )
+          .timeout(const Duration(seconds: 5));
+      return response.statusCode == 200;
+    } catch (e) {
+      print('[DEVICE_SERVICE] Error assigning zone: $e');
+      return false;
     }
   }
 

@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 
 import '../models/device_distance_model.dart';
 import '../models/device_model.dart';
+import '../models/light_scene_model.dart';
 import '../services/device_service.dart';
 
 class PositioningScreen extends StatefulWidget {
@@ -23,7 +24,11 @@ class _PositioningScreenState extends State<PositioningScreen> {
     ttlMs: 5000,
   );
   List<DeviceModel> _devices = [];
+  List<RoomZoneModel> _zones = [];
+  List<LightSceneModel> _scenes = [];
+  String? _selectedZoneId;
   bool _isLoading = true;
+  bool _isSavingScene = false;
   DateTime? _lastPolledAt;
 
   @override
@@ -50,14 +55,21 @@ class _PositioningScreenState extends State<PositioningScreen> {
 
     final devicesFuture = DeviceService.getDevices();
     final summaryFuture = DeviceService.getPositioningSummary();
+    final zonesFuture = DeviceService.getZones();
+    final scenesFuture = DeviceService.getScenes();
     final devices = await devicesFuture;
     final summary = await summaryFuture;
+    final zones = await zonesFuture;
+    final scenes = await scenesFuture;
 
     if (!mounted) return;
 
     setState(() {
       _devices = devices;
       _summary = summary;
+      _zones = zones;
+      _scenes = scenes;
+      _selectedZoneId ??= zones.isNotEmpty ? zones.first.id : null;
       _lastPolledAt = DateTime.now();
       _isLoading = false;
     });
@@ -116,6 +128,8 @@ class _PositioningScreenState extends State<PositioningScreen> {
                   const SizedBox(height: 16),
                   _buildPositionScheme(context),
                   const SizedBox(height: 16),
+                  _buildScenesPanel(context),
+                  const SizedBox(height: 16),
                   _buildOrientationPanel(context),
                   const SizedBox(height: 16),
                   if (_summary.distances.isEmpty)
@@ -124,6 +138,127 @@ class _PositioningScreenState extends State<PositioningScreen> {
                     _buildDistanceList(context),
                 ],
               ),
+      ),
+    );
+  }
+
+  Widget _buildScenesPanel(BuildContext context) {
+    final theme = Theme.of(context);
+
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                const Icon(Icons.auto_awesome_outlined),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    'Световые сцены',
+                    style: theme.textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+                FilledButton.icon(
+                  icon: _isSavingScene
+                      ? const SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Icon(Icons.bookmark_add_outlined),
+                  label: const Text('Сохранить'),
+                  onPressed: _isSavingScene ? null : _saveCurrentScene,
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            if (_zones.isNotEmpty)
+              DropdownButtonFormField<String>(
+                initialValue: _selectedZoneId,
+                decoration: const InputDecoration(
+                  labelText: 'Зона для новой сцены',
+                  border: OutlineInputBorder(),
+                ),
+                items: _zones
+                    .map(
+                      (zone) => DropdownMenuItem(
+                        value: zone.id,
+                        child: Text(
+                          '${zone.name}${zone.heightM == null ? '' : ' · ${zone.heightM!.toStringAsFixed(1)} м'}',
+                        ),
+                      ),
+                    )
+                    .toList(),
+                onChanged: (value) => setState(() => _selectedZoneId = value),
+              ),
+            const SizedBox(height: 12),
+            if (_scenes.isEmpty)
+              Text(
+                'Сохраненных сцен пока нет',
+                style: theme.textTheme.bodySmall,
+              )
+            else
+              ..._scenes.take(4).map((scene) {
+                final zoneName = _zones
+                    .where((zone) => zone.id == scene.zoneId)
+                    .map((zone) => zone.name)
+                    .firstOrNull;
+                return ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  leading: const Icon(Icons.light_mode_outlined),
+                  title: Text(scene.name),
+                  subtitle: Text(
+                    '${scene.devices.length} плат${zoneName == null ? '' : ' · $zoneName'}',
+                  ),
+                  trailing: IconButton(
+                    icon: const Icon(Icons.play_arrow),
+                    tooltip: 'Применить сцену',
+                    onPressed: () => _applyScene(scene.id),
+                  ),
+                );
+              }),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _saveCurrentScene() async {
+    setState(() => _isSavingScene = true);
+    final scene = await DeviceService.saveScene(
+      'Сцена ${DateTime.now().hour.toString().padLeft(2, '0')}:${DateTime.now().minute.toString().padLeft(2, '0')}',
+      zoneId: _selectedZoneId,
+    );
+    if (!mounted) return;
+
+    setState(() => _isSavingScene = false);
+    if (scene == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Не удалось сохранить сцену')),
+      );
+      return;
+    }
+
+    await _loadData(showLoader: false);
+    if (!mounted) return;
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text('Сцена "${scene.name}" сохранена')));
+  }
+
+  Future<void> _applyScene(String sceneId) async {
+    final ok = await DeviceService.applyScene(sceneId);
+    if (!mounted) return;
+    await _loadData(showLoader: false);
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(ok ? 'Сцена применена' : 'Не удалось применить сцену'),
       ),
     );
   }
@@ -489,7 +624,8 @@ class _PositioningPainter extends CustomPainter {
       );
       textPainter.paint(
         canvas,
-        bubbleRect.center - Offset(textPainter.width / 2, textPainter.height / 2),
+        bubbleRect.center -
+            Offset(textPainter.width / 2, textPainter.height / 2),
       );
     }
 
