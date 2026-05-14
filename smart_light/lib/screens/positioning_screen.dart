@@ -116,6 +116,8 @@ class _PositioningScreenState extends State<PositioningScreen> {
                   const SizedBox(height: 16),
                   _buildPositionScheme(context),
                   const SizedBox(height: 16),
+                  _buildOrientationPanel(context),
+                  const SizedBox(height: 16),
                   if (_summary.distances.isEmpty)
                     _buildEmptyState()
                   else
@@ -205,6 +207,64 @@ class _PositioningScreenState extends State<PositioningScreen> {
               ),
       ),
     );
+  }
+
+  Widget _buildOrientationPanel(BuildContext context) {
+    final theme = Theme.of(context);
+    final nodeIds = _summary.nodes.map((node) => node.deviceId).toSet();
+    final visibleDevices = _devices
+        .where((device) => nodeIds.isEmpty || nodeIds.contains(device.id))
+        .take(3)
+        .toList();
+
+    if (visibleDevices.isEmpty) {
+      return const SizedBox.shrink();
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Направление ламп',
+          style: theme.textTheme.titleMedium?.copyWith(
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+        const SizedBox(height: 8),
+        ...visibleDevices.map((device) {
+          final pan = device.servo1Angle.round();
+          final tilt = device.servo2Angle.round();
+          return Card(
+            margin: const EdgeInsets.only(bottom: 8),
+            child: ListTile(
+              leading: const Icon(Icons.explore_outlined),
+              title: Text(_deviceName(device.id)),
+              subtitle: Text(
+                '${_panLabel(device.servo1Angle)} · ${_tiltLabel(device.servo2Angle)} · высота не задана',
+              ),
+              trailing: Text(
+                '$pan° / $tilt°',
+                style: theme.textTheme.titleMedium?.copyWith(
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
+          );
+        }),
+      ],
+    );
+  }
+
+  String _panLabel(double angle) {
+    if (angle < 70) return 'влево';
+    if (angle > 110) return 'вправо';
+    return 'по центру';
+  }
+
+  String _tiltLabel(double angle) {
+    if (angle < 70) return 'вверх';
+    if (angle > 110) return 'вниз';
+    return 'горизонтально';
   }
 
   Widget _buildEmptyState() {

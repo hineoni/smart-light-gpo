@@ -51,8 +51,14 @@ const FILTER_SAMPLE_COUNT = 7;
 const FILTER_ALPHA = 0.22;
 const FILTER_OUTLIER_ALPHA = 0.08;
 const FILTER_OUTLIER_GATE_M = 0.35;
+const DISPLAY_DEADBAND_M = 0.10;
 const distances: Map<string, StoredDeviceDistance> = new Map();
-const distanceFilters: Map<string, { samples: number[]; filteredDistanceM: number }> = new Map();
+const distanceFilters: Map<string, {
+  samples: number[];
+  filteredDistanceM: number;
+  publishedDistanceM: number;
+}> = new Map();
+const mappedPairFilters: Map<string, number> = new Map();
 
 function normalizePair(fromDeviceId: string, toDeviceId: string) {
   return [fromDeviceId, toDeviceId].sort().join('::');
@@ -77,7 +83,11 @@ function median(values: number[]) {
 }
 
 function smoothDistance(key: string, rawDistanceM: number) {
-  const filter = distanceFilters.get(key) ?? { samples: [], filteredDistanceM: rawDistanceM };
+  const filter = distanceFilters.get(key) ?? {
+    samples: [],
+    filteredDistanceM: rawDistanceM,
+    publishedDistanceM: rawDistanceM,
+  };
   filter.samples.push(rawDistanceM);
   if (filter.samples.length > FILTER_SAMPLE_COUNT) {
     filter.samples.shift();
@@ -87,8 +97,21 @@ function smoothDistance(key: string, rawDistanceM: number) {
   const delta = Math.abs(medianDistanceM - filter.filteredDistanceM);
   const alpha = delta > FILTER_OUTLIER_GATE_M ? FILTER_OUTLIER_ALPHA : FILTER_ALPHA;
   filter.filteredDistanceM += (medianDistanceM - filter.filteredDistanceM) * alpha;
+  if (Math.abs(filter.filteredDistanceM - filter.publishedDistanceM) >= DISPLAY_DEADBAND_M) {
+    filter.publishedDistanceM = filter.filteredDistanceM;
+  }
   distanceFilters.set(key, filter);
-  return filter.filteredDistanceM;
+  return filter.publishedDistanceM;
+}
+
+function publishMappedDistance(key: string, distanceM: number) {
+  const previous = mappedPairFilters.get(key);
+  if (previous === undefined || Math.abs(distanceM - previous) >= DISPLAY_DEADBAND_M) {
+    const next = Number(distanceM.toFixed(3));
+    mappedPairFilters.set(key, next);
+    return next;
+  }
+  return previous;
 }
 
 export function updateDeviceRanges(
@@ -167,7 +190,7 @@ export function getPositioningSummary(onlineNodes: Array<string | OnlineNodeInpu
     }
   }
 
-  const currentDistancesByPair = new Map<string, DeviceDistance>();
+  const currentDistancesByPair = new Map<string, DeviceDistance[]>();
   for (const distance of getDistances()) {
     const fromDeviceId = deviceIdByUwbPeerId.get(distance.fromDeviceId) ?? distance.fromDeviceId;
     const toDeviceId = deviceIdByUwbPeerId.get(distance.toDeviceId) ?? distance.toDeviceId;
@@ -181,12 +204,19 @@ export function getPositioningSummary(onlineNodes: Array<string | OnlineNodeInpu
       toDeviceId,
     };
     const key = normalizePair(fromDeviceId, toDeviceId);
-    const previous = currentDistancesByPair.get(key);
-    if (!previous || new Date(mappedDistance.updatedAt).getTime() > new Date(previous.updatedAt).getTime()) {
-      currentDistancesByPair.set(key, mappedDistance);
-    }
+    currentDistancesByPair.set(key, [...(currentDistancesByPair.get(key) ?? []), mappedDistance]);
   }
-  const currentDistances = Array.from(currentDistancesByPair.values())
+  const currentDistances = Array.from(currentDistancesByPair.entries())
+    .map(([key, pairDistances]) => {
+      const latest = pairDistances.reduce((result, distance) => (
+        new Date(distance.updatedAt).getTime() > new Date(result.updatedAt).getTime() ? distance : result
+      ));
+      const averageDistanceM = pairDistances.reduce((sum, distance) => sum + distance.distanceM, 0) / pairDistances.length;
+      return {
+        ...latest,
+        distanceM: publishMappedDistance(key, averageDistanceM),
+      };
+    })
     .sort((a, b) => `${a.fromDeviceId}:${a.toDeviceId}`.localeCompare(`${b.fromDeviceId}:${b.toDeviceId}`));
 
   const nodeIds = new Set<string>(onlineByDeviceId.keys());
@@ -248,6 +278,7 @@ export function setMockDistances(nextDistances: StoredDeviceDistance[]) {
 
     const key = normalizePair(distance.fromDeviceId, distance.toDeviceId);
     distanceFilters.delete(key);
+    mappedPairFilters.delete(key);
     distances.set(key, {
       ...distance,
       distanceM: Number(distance.distanceM.toFixed(3)),
