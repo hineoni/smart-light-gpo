@@ -18,6 +18,7 @@
 #define UWB_FRAME_TAIL 0xAA
 #define UWB_STALE_AFTER_MS 5000
 #define UWB_LOG_INTERVAL_MS 1000
+#define UWB_AT_RESPONSE_BUFFER_SIZE 160
 
 static const char *TAG = "UWB_POSITIONING";
 
@@ -26,6 +27,12 @@ static uwb_positioning_config_t s_config = {
     .tx_pin = 18,
     .rx_pin = 19,
     .baud_rate = 115200,
+    .auto_config_enabled = false,
+    .role = 1,
+    .pid = 255,
+    .period = 5,
+    .local_address = 0x0000,
+    .peer0_address = 0x0001,
 };
 
 static bool s_ready = false;
@@ -92,7 +99,7 @@ static bool parse_mk8000_frame(const uint8_t *frame, uwb_range_t *range)
     uint16_t distance_cm = (uint16_t)frame[4] | ((uint16_t)frame[5] << 8);
     int rssi_dbm = (int)frame[6] - 256;
 
-    if (peer_addr == 0 || distance_cm > 10000) {
+    if (distance_cm > 10000) {
         return false;
     }
 
@@ -239,6 +246,100 @@ static void remember_rx_hex(const uint8_t *bytes, int bytes_read)
     }
 }
 
+static void reset_parser_state(void)
+{
+    memset(s_ranges, 0, sizeof(s_ranges));
+    memset(&s_stats, 0, sizeof(s_stats));
+    s_stats.auto_config_enabled = s_config.auto_config_enabled;
+    s_stats.role = s_config.role;
+    s_stats.pid = s_config.pid;
+    s_stats.period = s_config.period;
+    s_stats.local_address = s_config.local_address;
+    s_stats.peer0_address = s_config.peer0_address;
+    memset(s_line_buffer, 0, sizeof(s_line_buffer));
+    s_line_length = 0;
+    memset(s_frame_buffer, 0, sizeof(s_frame_buffer));
+    s_frame_length = 0;
+}
+
+static esp_err_t write_at_command(const char *command)
+{
+    ESP_LOGI(TAG, "MK8000 AT > %s", command);
+    uart_flush_input(s_config.uart_num);
+
+    int written = uart_write_bytes(s_config.uart_num, command, strlen(command));
+    if (written < 0 || written != (int)strlen(command)) {
+        ESP_LOGE(TAG, "Failed to write MK8000 AT command: %s", command);
+        return ESP_FAIL;
+    }
+
+    uint8_t response[UWB_AT_RESPONSE_BUFFER_SIZE] = {0};
+    int total = 0;
+    int64_t deadline_ms = now_ms() + 350;
+    while (now_ms() < deadline_ms && total < (int)sizeof(response) - 1) {
+        int bytes_read = uart_read_bytes(s_config.uart_num,
+                                         response + total,
+                                         sizeof(response) - 1 - total,
+                                         pdMS_TO_TICKS(50));
+        if (bytes_read > 0) {
+            total += bytes_read;
+        }
+    }
+
+    if (total > 0) {
+        response[total] = '\0';
+        for (int i = 0; i < total; i++) {
+            if (response[i] == '\r' || response[i] == '\n') {
+                response[i] = ' ';
+            } else if (response[i] < 32 || response[i] > 126) {
+                response[i] = '.';
+            }
+        }
+        ESP_LOGI(TAG, "MK8000 AT < %s", (char *)response);
+    } else {
+        ESP_LOGW(TAG, "MK8000 AT command had no response: %s", command);
+    }
+
+    vTaskDelay(pdMS_TO_TICKS(80));
+    return ESP_OK;
+}
+
+static void write_at_format(const char *format, int value)
+{
+    char command[40];
+    snprintf(command, sizeof(command), format, value);
+    write_at_command(command);
+}
+
+static void configure_mk8000(void)
+{
+    if (!s_config.auto_config_enabled) {
+        return;
+    }
+
+    ESP_LOGI(TAG,
+             "Configuring MK8000: role=%d pid=%u period=%u local=%04X peer0=%04X",
+             s_config.role, s_config.pid, s_config.period,
+             s_config.local_address, s_config.peer0_address);
+
+    write_at_command("AT+MODE=0\r\n");
+    write_at_format("AT+ROLE=%d\r\n", s_config.role);
+    write_at_format("AT+PID=%d\r\n", s_config.pid);
+    write_at_format("AT+PERIOD=%d\r\n", s_config.period);
+    write_at_format("AT+UART=%d\r\n", s_config.baud_rate);
+    write_at_command("AT+PWR=4\r\n");
+    write_at_command("AT+LPWR=0\r\n");
+    write_at_format("AT+MADDR=%04X\r\n", s_config.local_address);
+    write_at_format("AT+SADDR0=%04X\r\n", s_config.peer0_address);
+    write_at_command("AT+SADDR1=0000\r\n");
+    write_at_command("AT+SADDR2=0000\r\n");
+    write_at_command("AT+RST\r\n");
+
+    vTaskDelay(pdMS_TO_TICKS(1200));
+    uart_flush_input(s_config.uart_num);
+    ESP_LOGI(TAG, "MK8000 auto-configuration finished");
+}
+
 static void process_rx_byte(uint8_t byte, int *processed_lines)
 {
     if (s_frame_length == 0) {
@@ -330,18 +431,18 @@ esp_err_t uwb_positioning_init(const uwb_positioning_config_t *config)
         return ret;
     }
 
-    memset(s_ranges, 0, sizeof(s_ranges));
-    memset(&s_stats, 0, sizeof(s_stats));
-    memset(s_line_buffer, 0, sizeof(s_line_buffer));
-    s_line_length = 0;
-    memset(s_frame_buffer, 0, sizeof(s_frame_buffer));
-    s_frame_length = 0;
+    configure_mk8000();
+    reset_parser_state();
     s_last_log_ms = now_ms();
     s_last_rx_diag_ms = s_last_log_ms;
     s_ready = true;
 
     ESP_LOGI(TAG, "Initialized UWB UART: uart=%d tx=GPIO%d rx=GPIO%d baud=%d",
              s_config.uart_num, s_config.tx_pin, s_config.rx_pin, s_config.baud_rate);
+    ESP_LOGI(TAG, "MK8000 config: auto=%s role=%d pid=%u period=%u local=%04X peer0=%04X",
+             s_config.auto_config_enabled ? "yes" : "no",
+             s_config.role, s_config.pid, s_config.period,
+             s_config.local_address, s_config.peer0_address);
     ESP_LOGI(TAG, "Expecting MK8000 binary frames: F0 05 <addr_lo> <addr_hi> <dist_lo> <dist_hi> <rssi> AA");
     ESP_LOGI(TAG, "Diagnostic text lines like 'DIST,<peer>,<meters>' remain supported");
 

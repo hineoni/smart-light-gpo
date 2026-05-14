@@ -33,6 +33,40 @@ static device_config_t g_device_config = {0};
 // Флаги состояния
 static bool g_websocket_started = false;
 
+static bool configure_uwb_for_device(uwb_positioning_config_t *uwb_config)
+{
+    if (uwb_config == NULL || !g_device_config.is_valid) {
+        return false;
+    }
+
+    uwb_config->auto_config_enabled = true;
+    uwb_config->pid = 255;
+    uwb_config->period = 5;
+
+    if (strstr(g_device_config.device_id, "14335c382ddc") != NULL) {
+        uwb_config->role = 1;
+        uwb_config->local_address = 0x0000;
+        uwb_config->peer0_address = 0x0001;
+        ESP_LOGI(TAG, "UWB role selected for %s: host local=0000 peer0=0001",
+                 g_device_config.device_id);
+        return true;
+    }
+
+    if (strstr(g_device_config.device_id, "0483085966e0") != NULL) {
+        uwb_config->role = 0;
+        uwb_config->local_address = 0x0001;
+        uwb_config->peer0_address = 0x0000;
+        ESP_LOGI(TAG, "UWB role selected for %s: tag local=0001 host=0000",
+                 g_device_config.device_id);
+        return true;
+    }
+
+    uwb_config->auto_config_enabled = false;
+    ESP_LOGW(TAG, "No fixed UWB role mapping for %s; MK8000 auto-config disabled",
+             g_device_config.device_id);
+    return false;
+}
+
 /**
  * @brief Задача для мониторинга кнопки сброса
  */
@@ -291,6 +325,7 @@ static esp_err_t init_system(void)
         .rx_pin = 19,
         .baud_rate = 115200,
     };
+    configure_uwb_for_device(&uwb_config);
     ret = uwb_positioning_init(&uwb_config);
     if (ret != ESP_OK) {
         ESP_LOGE(TAG, "Failed to initialize UWB positioning: %s", esp_err_to_name(ret));

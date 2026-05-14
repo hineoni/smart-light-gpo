@@ -21,6 +21,12 @@ interface DeviceConfig {
   uwbInvalidLines?: number;
   uwbLastByteAtMs?: number;
   uwbLastRxHex?: string;
+  uwbAutoConfig?: boolean;
+  uwbRole?: number;
+  uwbPid?: number;
+  uwbPeriod?: number;
+  uwbLocalAddress?: number;
+  uwbPeer0Address?: number;
 }
 
 let devices: Map<string, DeviceConfig> = new Map();
@@ -96,6 +102,12 @@ export interface UwbDiagnostics {
   invalidLines?: number;
   lastByteAtMs?: number;
   lastRxHex?: string;
+  autoConfig?: boolean;
+  role?: number;
+  pid?: number;
+  period?: number;
+  localAddress?: number;
+  peer0Address?: number;
 }
 
 export function updateDeviceUwbStatus(
@@ -116,6 +128,12 @@ export function updateDeviceUwbStatus(
   if (typeof diagnostics?.invalidLines === 'number') device.uwbInvalidLines = diagnostics.invalidLines;
   if (typeof diagnostics?.lastByteAtMs === 'number') device.uwbLastByteAtMs = diagnostics.lastByteAtMs;
   if (typeof diagnostics?.lastRxHex === 'string') device.uwbLastRxHex = diagnostics.lastRxHex;
+  if (typeof diagnostics?.autoConfig === 'boolean') device.uwbAutoConfig = diagnostics.autoConfig;
+  if (typeof diagnostics?.role === 'number') device.uwbRole = diagnostics.role;
+  if (typeof diagnostics?.pid === 'number') device.uwbPid = diagnostics.pid;
+  if (typeof diagnostics?.period === 'number') device.uwbPeriod = diagnostics.period;
+  if (typeof diagnostics?.localAddress === 'number') device.uwbLocalAddress = diagnostics.localAddress;
+  if (typeof diagnostics?.peer0Address === 'number') device.uwbPeer0Address = diagnostics.peer0Address;
   device.lastHeartbeat = new Date().toISOString();
   devices.set(id, device);
 }

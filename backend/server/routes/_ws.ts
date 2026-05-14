@@ -20,6 +20,12 @@ interface HeartbeatMsg extends IncomingBase {
     invalidLines?: number;
     lastByteAtMs?: number;
     lastRxHex?: string;
+    autoConfig?: boolean;
+    role?: number;
+    pid?: number;
+    period?: number;
+    localAddress?: number;
+    peer0Address?: number;
     ranges?: Array<{ peerId: string; distanceM: number; updatedAtMs?: number; rssiDbm?: number }>;
   };
 }

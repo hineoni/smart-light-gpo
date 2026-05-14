@@ -21,6 +21,12 @@ export default defineEventHandler(() => {
       uwbInvalidLines: d.uwbInvalidLines,
       uwbLastByteAtMs: d.uwbLastByteAtMs,
       uwbLastRxHex: d.uwbLastRxHex,
+      uwbAutoConfig: d.uwbAutoConfig,
+      uwbRole: d.uwbRole,
+      uwbPid: d.uwbPid,
+      uwbPeriod: d.uwbPeriod,
+      uwbLocalAddress: d.uwbLocalAddress,
+      uwbPeer0Address: d.uwbPeer0Address,
     };
   });
   return list;
