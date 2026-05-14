@@ -19,6 +19,8 @@ export interface PositioningNode {
   deviceId: string;
   online: boolean;
   lastSeenAt?: string;
+  uwbReady?: boolean;
+  uwbRangeCount?: number;
 }
 
 export interface PositioningSummary {
@@ -86,9 +88,22 @@ export function getDistances(): DeviceDistance[] {
     .sort((a, b) => `${a.fromDeviceId}:${a.toDeviceId}`.localeCompare(`${b.fromDeviceId}:${b.toDeviceId}`));
 }
 
-export function getPositioningSummary(onlineDeviceIds: string[] = []): PositioningSummary {
+interface OnlineNodeInput {
+  deviceId: string;
+  uwbReady?: boolean;
+  uwbRangeCount?: number;
+}
+
+export function getPositioningSummary(onlineNodes: Array<string | OnlineNodeInput> = []): PositioningSummary {
   const currentDistances = getDistances();
-  const nodeIds = new Set<string>(onlineDeviceIds);
+  const onlineByDeviceId = new Map<string, OnlineNodeInput>();
+
+  for (const node of onlineNodes) {
+    const onlineNode = typeof node === 'string' ? { deviceId: node } : node;
+    onlineByDeviceId.set(onlineNode.deviceId, onlineNode);
+  }
+
+  const nodeIds = new Set<string>(onlineByDeviceId.keys());
 
   for (const distance of currentDistances) {
     nodeIds.add(distance.fromDeviceId);
@@ -106,15 +121,20 @@ export function getPositioningSummary(onlineDeviceIds: string[] = []): Positioni
     distances: currentDistances,
     nodes: Array.from(nodeIds)
       .sort((a, b) => a.localeCompare(b))
-      .map(deviceId => ({
-        deviceId,
-        online: onlineDeviceIds.includes(deviceId),
-        lastSeenAt: currentDistances
-          .filter(distance => distance.fromDeviceId === deviceId || distance.toDeviceId === deviceId)
-          .map(distance => distance.updatedAt)
-          .sort()
-          .at(-1),
-      })),
+      .map(deviceId => {
+        const onlineNode = onlineByDeviceId.get(deviceId);
+        return {
+          deviceId,
+          online: onlineNode !== undefined,
+          lastSeenAt: currentDistances
+            .filter(distance => distance.fromDeviceId === deviceId || distance.toDeviceId === deviceId)
+            .map(distance => distance.updatedAt)
+            .sort()
+            .at(-1),
+          uwbReady: onlineNode?.uwbReady,
+          uwbRangeCount: onlineNode?.uwbRangeCount,
+        };
+      }),
     lastUpdated,
     ttlMs: DISTANCE_TTL_MS,
   };

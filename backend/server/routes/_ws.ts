@@ -1,4 +1,4 @@
-import { getDevice, updateDeviceStatus, autoRegisterDevice } from '~/utils/deviceStorage';
+import { getDevice, updateDeviceStatus, autoRegisterDevice, updateDeviceUwbStatus } from '~/utils/deviceStorage';
 import { registerPeer, unregisterPeer, updateHeartbeat } from '~/utils/wsRuntime';
 import { updateDeviceRanges } from '~/utils/positioningRuntime';
 
@@ -53,9 +53,10 @@ export default defineWebSocketHandler({
     }
 
     if (payload.type === 'heartbeat') {
-      const rt = updateHeartbeat(peer.id, payload.servo1?.angle, payload.servo2?.angle);
+      const rt = updateHeartbeat(peer.id, payload.servo1?.angle, payload.servo2?.angle, payload.uwb);
       if (rt?.deviceId) {
         updateDeviceStatus(rt.deviceId, 'connected');
+        updateDeviceUwbStatus(rt.deviceId, payload.uwb?.ready, payload.uwb?.rangeCount);
         updateDeviceRanges(rt.deviceId, payload.uwb?.ranges);
       }
       peer.send(JSON.stringify({ type: 'ack', action: 'heartbeat' }));
