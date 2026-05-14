@@ -72,6 +72,13 @@ class _PositioningScreenState extends State<PositioningScreen> {
     return id;
   }
 
+  String _nodeLabel(String id) {
+    final suffix = id.length >= 4
+        ? id.substring(id.length - 4).toUpperCase()
+        : id;
+    return 'Плата $suffix';
+  }
+
   String _timeLabel(DateTime? value) {
     if (value == null) return 'нет данных';
     return '${value.hour.toString().padLeft(2, '0')}:'
@@ -184,7 +191,7 @@ class _PositioningScreenState extends State<PositioningScreen> {
                     distances: _summary.distances,
                     labels: {
                       for (final node in nodes.take(3))
-                        node.deviceId: _deviceName(node.deviceId),
+                        node.deviceId: _nodeLabel(node.deviceId),
                     },
                     colorScheme: theme.colorScheme,
                     textStyle:
