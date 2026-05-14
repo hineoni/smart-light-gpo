@@ -21,6 +21,12 @@ export interface PositioningNode {
   lastSeenAt?: string;
   uwbReady?: boolean;
   uwbRangeCount?: number;
+  uwbUartBytes?: number;
+  uwbParsedFrames?: number;
+  uwbInvalidFrames?: number;
+  uwbParsedLines?: number;
+  uwbInvalidLines?: number;
+  uwbLastByteAtMs?: number;
 }
 
 export interface PositioningSummary {
@@ -92,6 +98,12 @@ interface OnlineNodeInput {
   deviceId: string;
   uwbReady?: boolean;
   uwbRangeCount?: number;
+  uwbUartBytes?: number;
+  uwbParsedFrames?: number;
+  uwbInvalidFrames?: number;
+  uwbParsedLines?: number;
+  uwbInvalidLines?: number;
+  uwbLastByteAtMs?: number;
 }
 
 export function getPositioningSummary(onlineNodes: Array<string | OnlineNodeInput> = []): PositioningSummary {
@@ -133,6 +145,12 @@ export function getPositioningSummary(onlineNodes: Array<string | OnlineNodeInpu
             .at(-1),
           uwbReady: onlineNode?.uwbReady,
           uwbRangeCount: onlineNode?.uwbRangeCount,
+          uwbUartBytes: onlineNode?.uwbUartBytes,
+          uwbParsedFrames: onlineNode?.uwbParsedFrames,
+          uwbInvalidFrames: onlineNode?.uwbInvalidFrames,
+          uwbParsedLines: onlineNode?.uwbParsedLines,
+          uwbInvalidLines: onlineNode?.uwbInvalidLines,
+          uwbLastByteAtMs: onlineNode?.uwbLastByteAtMs,
         };
       }),
     lastUpdated,

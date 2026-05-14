@@ -432,6 +432,8 @@ esp_err_t websocket_client_send_heartbeat(void)
     if (uwb != NULL && ranges != NULL) {
         uwb_range_t current_ranges[UWB_MAX_RANGES];
         size_t range_count = uwb_positioning_get_ranges(current_ranges, UWB_MAX_RANGES);
+        uwb_positioning_stats_t uwb_stats = {0};
+        uwb_positioning_get_stats(&uwb_stats);
 
         for (size_t i = 0; i < range_count; i++) {
             cJSON* range = cJSON_CreateObject();
@@ -449,6 +451,12 @@ esp_err_t websocket_client_send_heartbeat(void)
         cJSON_AddItemToObject(uwb, "ranges", ranges);
         cJSON_AddBoolToObject(uwb, "ready", uwb_positioning_is_ready());
         cJSON_AddNumberToObject(uwb, "rangeCount", range_count);
+        cJSON_AddNumberToObject(uwb, "uartBytes", uwb_stats.total_bytes);
+        cJSON_AddNumberToObject(uwb, "parsedFrames", uwb_stats.parsed_frames);
+        cJSON_AddNumberToObject(uwb, "invalidFrames", uwb_stats.invalid_frames);
+        cJSON_AddNumberToObject(uwb, "parsedLines", uwb_stats.parsed_lines);
+        cJSON_AddNumberToObject(uwb, "invalidLines", uwb_stats.invalid_lines);
+        cJSON_AddNumberToObject(uwb, "lastByteAtMs", uwb_stats.last_byte_at_ms);
         cJSON_AddItemToObject(heartbeat_json, "uwb", uwb);
     } else {
         if (uwb != NULL) cJSON_Delete(uwb);

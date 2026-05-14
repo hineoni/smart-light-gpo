@@ -6,6 +6,12 @@ interface RuntimeEntry {
   servo2Angle?: number;
   uwbReady?: boolean;
   uwbRangeCount?: number;
+  uwbUartBytes?: number;
+  uwbParsedFrames?: number;
+  uwbInvalidFrames?: number;
+  uwbParsedLines?: number;
+  uwbInvalidLines?: number;
+  uwbLastByteAtMs?: number;
 }
 
 const runtime: Map<string, RuntimeEntry> = new Map(); // key: peer.id
@@ -22,7 +28,16 @@ export function updateHeartbeat(
   peerId: string,
   s1?: number,
   s2?: number,
-  uwb?: { ready?: boolean; rangeCount?: number }
+  uwb?: {
+    ready?: boolean;
+    rangeCount?: number;
+    uartBytes?: number;
+    parsedFrames?: number;
+    invalidFrames?: number;
+    parsedLines?: number;
+    invalidLines?: number;
+    lastByteAtMs?: number;
+  }
 ) {
   const entry = runtime.get(peerId);
   if (!entry) return null;
@@ -31,6 +46,12 @@ export function updateHeartbeat(
   if (typeof s2 === 'number') entry.servo2Angle = s2;
   if (typeof uwb?.ready === 'boolean') entry.uwbReady = uwb.ready;
   if (typeof uwb?.rangeCount === 'number') entry.uwbRangeCount = uwb.rangeCount;
+  if (typeof uwb?.uartBytes === 'number') entry.uwbUartBytes = uwb.uartBytes;
+  if (typeof uwb?.parsedFrames === 'number') entry.uwbParsedFrames = uwb.parsedFrames;
+  if (typeof uwb?.invalidFrames === 'number') entry.uwbInvalidFrames = uwb.invalidFrames;
+  if (typeof uwb?.parsedLines === 'number') entry.uwbParsedLines = uwb.parsedLines;
+  if (typeof uwb?.invalidLines === 'number') entry.uwbInvalidLines = uwb.invalidLines;
+  if (typeof uwb?.lastByteAtMs === 'number') entry.uwbLastByteAtMs = uwb.lastByteAtMs;
   return entry;
 }
 
@@ -48,6 +69,12 @@ export function onlineDevices(): Array<{
   servo2Angle?: number;
   uwbReady?: boolean;
   uwbRangeCount?: number;
+  uwbUartBytes?: number;
+  uwbParsedFrames?: number;
+  uwbInvalidFrames?: number;
+  uwbParsedLines?: number;
+  uwbInvalidLines?: number;
+  uwbLastByteAtMs?: number;
 }> {
   const now = Date.now();
   return Array.from(runtime.values())
@@ -59,6 +86,12 @@ export function onlineDevices(): Array<{
       servo2Angle: e.servo2Angle,
       uwbReady: e.uwbReady,
       uwbRangeCount: e.uwbRangeCount,
+      uwbUartBytes: e.uwbUartBytes,
+      uwbParsedFrames: e.uwbParsedFrames,
+      uwbInvalidFrames: e.uwbInvalidFrames,
+      uwbParsedLines: e.uwbParsedLines,
+      uwbInvalidLines: e.uwbInvalidLines,
+      uwbLastByteAtMs: e.uwbLastByteAtMs,
     }));
 }
 

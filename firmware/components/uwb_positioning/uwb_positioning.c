@@ -4,6 +4,7 @@
 #include "esp_log.h"
 #include "esp_timer.h"
 #include "freertos/FreeRTOS.h"
+#include <inttypes.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -29,7 +30,9 @@ static uwb_positioning_config_t s_config = {
 
 static bool s_ready = false;
 static int64_t s_last_log_ms = 0;
+static int64_t s_last_rx_diag_ms = 0;
 static uwb_range_t s_ranges[UWB_MAX_RANGES] = {0};
+static uwb_positioning_stats_t s_stats = {0};
 static char s_line_buffer[UWB_LINE_BUFFER_SIZE];
 static size_t s_line_length = 0;
 static uint8_t s_frame_buffer[UWB_FRAME_SIZE];
@@ -146,12 +149,14 @@ static void process_mk8000_frame(const uint8_t *frame)
 {
     uwb_range_t range;
     if (parse_mk8000_frame(frame, &range)) {
+        s_stats.parsed_frames++;
         upsert_range(&range);
         ESP_LOGI(TAG, "Parsed MK8000 range: peer=%s distance=%.2fm rssi=%ddBm",
                  range.peer_id, (double)range.distance_m, range.rssi_dbm);
         return;
     }
 
+    s_stats.invalid_frames++;
     if (should_log_now()) {
         ESP_LOGW(TAG,
                  "Invalid MK8000 frame: %02X %02X %02X %02X %02X %02X %02X %02X",
@@ -171,13 +176,47 @@ static void process_uart_line(char *line)
 
     uwb_range_t range;
     if (parse_range_line(line, &range)) {
+        s_stats.parsed_lines++;
         upsert_range(&range);
         ESP_LOGI(TAG, "Parsed UWB range: peer=%s distance=%.3fm",
                  range.peer_id, (double)range.distance_m);
         return;
     }
 
+    s_stats.invalid_lines++;
     ESP_LOGW(TAG, "UWB line format is not recognized yet");
+}
+
+static void log_rx_diagnostics(const uint8_t *bytes, int bytes_read)
+{
+    int64_t current_ms = now_ms();
+    if ((current_ms - s_last_rx_diag_ms) < 5000) {
+        return;
+    }
+    s_last_rx_diag_ms = current_ms;
+
+    if (bytes_read <= 0) {
+        ESP_LOGW(TAG,
+                 "No UWB UART bytes yet: total=%" PRIu32 " frames=%" PRIu32 " invalidFrames=%" PRIu32
+                 " lines=%" PRIu32 " invalidLines=%" PRIu32,
+                 s_stats.total_bytes, s_stats.parsed_frames, s_stats.invalid_frames,
+                 s_stats.parsed_lines, s_stats.invalid_lines);
+        return;
+    }
+
+    char hex[96] = {0};
+    size_t offset = 0;
+    int dump_len = bytes_read < 16 ? bytes_read : 16;
+    for (int i = 0; i < dump_len && offset < sizeof(hex); i++) {
+        int written = snprintf(hex + offset, sizeof(hex) - offset, "%02X%s", bytes[i], i == dump_len - 1 ? "" : " ");
+        if (written <= 0) {
+            break;
+        }
+        offset += (size_t)written;
+    }
+
+    ESP_LOGI(TAG, "UWB UART rx: bytes=%d total=%" PRIu32 " first=%s",
+             bytes_read, s_stats.total_bytes, hex);
 }
 
 static void process_rx_byte(uint8_t byte, int *processed_lines)
@@ -265,11 +304,13 @@ esp_err_t uwb_positioning_init(const uwb_positioning_config_t *config)
     }
 
     memset(s_ranges, 0, sizeof(s_ranges));
+    memset(&s_stats, 0, sizeof(s_stats));
     memset(s_line_buffer, 0, sizeof(s_line_buffer));
     s_line_length = 0;
     memset(s_frame_buffer, 0, sizeof(s_frame_buffer));
     s_frame_length = 0;
     s_last_log_ms = now_ms();
+    s_last_rx_diag_ms = s_last_log_ms;
     s_ready = true;
 
     ESP_LOGI(TAG, "Initialized UWB UART: uart=%d tx=GPIO%d rx=GPIO%d baud=%d",
@@ -292,8 +333,13 @@ void uwb_positioning_task(void)
     while (processed_lines < UWB_MAX_LINES_PER_POLL) {
         int bytes_read = uart_read_bytes(s_config.uart_num, rx_buffer, sizeof(rx_buffer), 0);
         if (bytes_read <= 0) {
+            log_rx_diagnostics(NULL, 0);
             break;
         }
+
+        s_stats.total_bytes += (uint32_t)bytes_read;
+        s_stats.last_byte_at_ms = now_ms();
+        log_rx_diagnostics(rx_buffer, bytes_read);
 
         for (int i = 0; i < bytes_read; i++) {
             process_rx_byte(rx_buffer[i], &processed_lines);
@@ -321,4 +367,12 @@ size_t uwb_positioning_get_ranges(uwb_range_t *ranges, size_t max_ranges)
 bool uwb_positioning_is_ready(void)
 {
     return s_ready;
+}
+
+void uwb_positioning_get_stats(uwb_positioning_stats_t *stats)
+{
+    if (stats == NULL) {
+        return;
+    }
+    *stats = s_stats;
 }
