@@ -305,6 +305,79 @@ class DeviceService {
     }
   }
 
+  static Future<LightSceneModel?> updateScene(
+    String sceneId, {
+    String? name,
+    String? zoneId,
+    bool clearZone = false,
+  }) async {
+    try {
+      final response = await http
+          .put(
+            Uri.parse('$baseUrl/scenes/$sceneId'),
+            headers: {'Content-Type': 'application/json'},
+            body: json.encode({
+              if (name != null) 'name': name,
+              if (clearZone)
+                'zoneId': null
+              else if (zoneId != null)
+                'zoneId': zoneId,
+            }),
+          )
+          .timeout(const Duration(seconds: 5));
+
+      if (response.statusCode == 200) {
+        return LightSceneModel.fromJson(json.decode(response.body));
+      }
+    } catch (e) {
+      print('[DEVICE_SERVICE] Error updating scene: $e');
+    }
+    return null;
+  }
+
+  static Future<RoomZoneModel?> saveZone({
+    String? id,
+    required String name,
+    required double x,
+    required double y,
+    double? heightM,
+  }) async {
+    try {
+      final response = await http
+          .post(
+            Uri.parse('$baseUrl/zones'),
+            headers: {'Content-Type': 'application/json'},
+            body: json.encode({
+              if (id != null) 'id': id,
+              'name': name,
+              'x': x,
+              'y': y,
+              if (heightM != null) 'heightM': heightM,
+            }),
+          )
+          .timeout(const Duration(seconds: 5));
+
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        return RoomZoneModel.fromJson(json.decode(response.body));
+      }
+    } catch (e) {
+      print('[DEVICE_SERVICE] Error saving zone: $e');
+    }
+    return null;
+  }
+
+  static Future<bool> deleteZone(String zoneId) async {
+    try {
+      final response = await http
+          .delete(Uri.parse('$baseUrl/zones/$zoneId'))
+          .timeout(const Duration(seconds: 5));
+      return response.statusCode == 200;
+    } catch (e) {
+      print('[DEVICE_SERVICE] Error deleting zone: $e');
+      return false;
+    }
+  }
+
   static Future<bool> assignDeviceZone(String deviceId, String zoneId) async {
     try {
       final response = await http
