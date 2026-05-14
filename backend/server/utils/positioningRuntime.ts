@@ -11,6 +11,8 @@ export interface DeviceDistance {
   distanceM: number;
   updatedAt: string;
   rssiDbm?: number;
+  stability?: number;
+  stabilityLabel?: 'stable' | 'moving' | 'weak';
   ageMs: number;
   source: 'device' | 'mock';
 }
@@ -40,6 +42,10 @@ export interface PositioningNode {
 export interface PositioningSummary {
   distances: DeviceDistance[];
   nodes: PositioningNode[];
+  layout: {
+    nodes: Array<{ deviceId: string; x: number; y: number; label: string }>;
+    method: 'none' | 'line' | 'triangle';
+  };
   lastUpdated: string | null;
   ttlMs: number;
 }
@@ -112,6 +118,68 @@ function publishMappedDistance(key: string, distanceM: number) {
     return next;
   }
   return previous;
+}
+
+function stabilityFor(distance: DeviceDistance) {
+  const freshness = Math.max(0, Math.min(1, 1 - distance.ageMs / DISTANCE_TTL_MS));
+  const rssiQuality = typeof distance.rssiDbm === 'number'
+    ? Math.max(0, Math.min(1, (distance.rssiDbm + 95) / 55))
+    : 0.7;
+  const stability = Number((freshness * 0.55 + rssiQuality * 0.45).toFixed(2));
+  return {
+    stability,
+    stabilityLabel: stability > 0.72 ? 'stable' as const : stability > 0.45 ? 'moving' as const : 'weak' as const,
+  };
+}
+
+function buildLayout(nodeIds: string[], distances: DeviceDistance[]) {
+  if (nodeIds.length === 0) {
+    return { nodes: [], method: 'none' as const };
+  }
+
+  if (nodeIds.length === 1) {
+    return {
+      method: 'line' as const,
+      nodes: [{ deviceId: nodeIds[0], x: 0.5, y: 0.5, label: 'A' }],
+    };
+  }
+
+  if (nodeIds.length === 2) {
+    return {
+      method: 'line' as const,
+      nodes: [
+        { deviceId: nodeIds[0], x: 0.22, y: 0.5, label: 'A' },
+        { deviceId: nodeIds[1], x: 0.78, y: 0.5, label: 'B' },
+      ],
+    };
+  }
+
+  const [a, b, c] = nodeIds;
+  const distanceByPair = new Map(distances.map(distance => [normalizePair(distance.fromDeviceId, distance.toDeviceId), distance.distanceM]));
+  const ab = distanceByPair.get(normalizePair(a, b)) ?? 1;
+  const ac = distanceByPair.get(normalizePair(a, c)) ?? ab;
+  const bc = distanceByPair.get(normalizePair(b, c)) ?? ab;
+  const scale = 0.58 / Math.max(ab, ac, bc, 0.01);
+  const base = Math.max(0.01, ab * scale);
+  const acScaled = ac * scale;
+  const bcScaled = bc * scale;
+  const xFromA = Math.max(0, Math.min(base, (acScaled ** 2 - bcScaled ** 2 + base ** 2) / (2 * base)));
+  const yFromA = Math.sqrt(Math.max(0, acScaled ** 2 - xFromA ** 2));
+  const ax = 0.21;
+  const ay = 0.64;
+
+  return {
+    method: 'triangle' as const,
+    nodes: [
+      { deviceId: a, x: ax, y: ay, label: 'A' },
+      { deviceId: b, x: ax + base, y: ay, label: 'B' },
+      { deviceId: c, x: ax + xFromA, y: Math.max(0.18, ay - yFromA), label: 'C' },
+    ].map(node => ({
+      ...node,
+      x: Number(Math.max(0.08, Math.min(0.92, node.x)).toFixed(3)),
+      y: Number(Math.max(0.12, Math.min(0.88, node.y)).toFixed(3)),
+    })),
+  };
 }
 
 export function updateDeviceRanges(
@@ -217,6 +285,7 @@ export function getPositioningSummary(onlineNodes: Array<string | OnlineNodeInpu
         distanceM: publishMappedDistance(key, averageDistanceM),
       };
     })
+    .map(distance => ({ ...distance, ...stabilityFor(distance) }))
     .sort((a, b) => `${a.fromDeviceId}:${a.toDeviceId}`.localeCompare(`${b.fromDeviceId}:${b.toDeviceId}`));
 
   const nodeIds = new Set<string>(onlineByDeviceId.keys());
@@ -265,6 +334,7 @@ export function getPositioningSummary(onlineNodes: Array<string | OnlineNodeInpu
           uwbPeer0Address: onlineNode?.uwbPeer0Address,
         };
       }),
+    layout: buildLayout(Array.from(nodeIds).sort((a, b) => a.localeCompare(b)), currentDistances),
     lastUpdated,
     ttlMs: DISTANCE_TTL_MS,
   };
