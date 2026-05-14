@@ -47,7 +47,12 @@ export interface PositioningSummary {
 type StoredDeviceDistance = Omit<DeviceDistance, 'ageMs'>;
 
 const DISTANCE_TTL_MS = 5000;
+const FILTER_SAMPLE_COUNT = 7;
+const FILTER_ALPHA = 0.22;
+const FILTER_OUTLIER_ALPHA = 0.08;
+const FILTER_OUTLIER_GATE_M = 0.35;
 const distances: Map<string, StoredDeviceDistance> = new Map();
+const distanceFilters: Map<string, { samples: number[]; filteredDistanceM: number }> = new Map();
 
 function normalizePair(fromDeviceId: string, toDeviceId: string) {
   return [fromDeviceId, toDeviceId].sort().join('::');
@@ -61,6 +66,29 @@ function normalizeRssi(rssiDbm: unknown) {
   return typeof rssiDbm === 'number' && Number.isFinite(rssiDbm)
     ? Math.round(rssiDbm)
     : undefined;
+}
+
+function median(values: number[]) {
+  const sorted = [...values].sort((a, b) => a - b);
+  const middle = Math.floor(sorted.length / 2);
+  return sorted.length % 2 === 0
+    ? (sorted[middle - 1] + sorted[middle]) / 2
+    : sorted[middle];
+}
+
+function smoothDistance(key: string, rawDistanceM: number) {
+  const filter = distanceFilters.get(key) ?? { samples: [], filteredDistanceM: rawDistanceM };
+  filter.samples.push(rawDistanceM);
+  if (filter.samples.length > FILTER_SAMPLE_COUNT) {
+    filter.samples.shift();
+  }
+
+  const medianDistanceM = median(filter.samples);
+  const delta = Math.abs(medianDistanceM - filter.filteredDistanceM);
+  const alpha = delta > FILTER_OUTLIER_GATE_M ? FILTER_OUTLIER_ALPHA : FILTER_ALPHA;
+  filter.filteredDistanceM += (medianDistanceM - filter.filteredDistanceM) * alpha;
+  distanceFilters.set(key, filter);
+  return filter.filteredDistanceM;
 }
 
 export function updateDeviceRanges(
@@ -84,10 +112,11 @@ export function updateDeviceRanges(
     }
 
     const key = normalizePair(fromDeviceId, range.peerId);
+    const filteredDistanceM = smoothDistance(key, range.distanceM);
     distances.set(key, {
       fromDeviceId,
       toDeviceId: range.peerId,
-      distanceM: Number(range.distanceM.toFixed(3)),
+      distanceM: Number(filteredDistanceM.toFixed(3)),
       updatedAt: new Date().toISOString(),
       rssiDbm: normalizeRssi(range.rssiDbm),
       source,
@@ -218,6 +247,7 @@ export function setMockDistances(nextDistances: StoredDeviceDistance[]) {
     }
 
     const key = normalizePair(distance.fromDeviceId, distance.toDeviceId);
+    distanceFilters.delete(key);
     distances.set(key, {
       ...distance,
       distanceM: Number(distance.distanceM.toFixed(3)),
