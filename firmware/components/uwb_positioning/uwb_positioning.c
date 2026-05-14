@@ -204,7 +204,7 @@ static void log_rx_diagnostics(const uint8_t *bytes, int bytes_read)
         return;
     }
 
-    char hex[96] = {0};
+    char hex[sizeof(s_stats.last_rx_hex)] = {0};
     size_t offset = 0;
     int dump_len = bytes_read < 16 ? bytes_read : 16;
     for (int i = 0; i < dump_len && offset < sizeof(hex); i++) {
@@ -219,6 +219,26 @@ static void log_rx_diagnostics(const uint8_t *bytes, int bytes_read)
              bytes_read, s_stats.total_bytes, hex);
 }
 
+static void remember_rx_hex(const uint8_t *bytes, int bytes_read)
+{
+    if (bytes_read <= 0) {
+        return;
+    }
+
+    size_t offset = 0;
+    int dump_len = bytes_read < 16 ? bytes_read : 16;
+    memset(s_stats.last_rx_hex, 0, sizeof(s_stats.last_rx_hex));
+    for (int i = 0; i < dump_len && offset < sizeof(s_stats.last_rx_hex); i++) {
+        int written = snprintf(s_stats.last_rx_hex + offset,
+                               sizeof(s_stats.last_rx_hex) - offset,
+                               "%02X%s", bytes[i], i == dump_len - 1 ? "" : " ");
+        if (written <= 0) {
+            break;
+        }
+        offset += (size_t)written;
+    }
+}
+
 static void process_rx_byte(uint8_t byte, int *processed_lines)
 {
     if (s_frame_length == 0) {
@@ -230,6 +250,7 @@ static void process_rx_byte(uint8_t byte, int *processed_lines)
         s_frame_buffer[s_frame_length++] = byte;
 
         if (s_frame_length == 2 && s_frame_buffer[1] != UWB_FRAME_PAYLOAD_LEN) {
+            s_stats.invalid_frames++;
             if (should_log_now()) {
                 ESP_LOGW(TAG, "Dropping MK8000 frame with unexpected length byte: 0x%02X", s_frame_buffer[1]);
             }
@@ -264,6 +285,12 @@ static void process_rx_byte(uint8_t byte, int *processed_lines)
             ESP_LOGW(TAG, "Dropping overlong UWB UART line: %s", s_line_buffer);
             s_line_length = 0;
         }
+        return;
+    }
+
+    s_stats.discarded_bytes++;
+    if (should_log_now()) {
+        ESP_LOGW(TAG, "Discarding non-frame non-text UWB byte: 0x%02X", byte);
     }
 }
 
@@ -339,6 +366,7 @@ void uwb_positioning_task(void)
 
         s_stats.total_bytes += (uint32_t)bytes_read;
         s_stats.last_byte_at_ms = now_ms();
+        remember_rx_hex(rx_buffer, bytes_read);
         log_rx_diagnostics(rx_buffer, bytes_read);
 
         for (int i = 0; i < bytes_read; i++) {

@@ -14,11 +14,13 @@ interface DeviceConfig {
   uwbReady?: boolean;
   uwbRangeCount?: number;
   uwbUartBytes?: number;
+  uwbDiscardedBytes?: number;
   uwbParsedFrames?: number;
   uwbInvalidFrames?: number;
   uwbParsedLines?: number;
   uwbInvalidLines?: number;
   uwbLastByteAtMs?: number;
+  uwbLastRxHex?: string;
 }
 
 let devices: Map<string, DeviceConfig> = new Map();
@@ -87,11 +89,13 @@ export function updateDeviceLed(id: string, brightness?: number, r?: number, g?:
 
 export interface UwbDiagnostics {
   uartBytes?: number;
+  discardedBytes?: number;
   parsedFrames?: number;
   invalidFrames?: number;
   parsedLines?: number;
   invalidLines?: number;
   lastByteAtMs?: number;
+  lastRxHex?: string;
 }
 
 export function updateDeviceUwbStatus(
@@ -105,11 +109,13 @@ export function updateDeviceUwbStatus(
   if (typeof ready === 'boolean') device.uwbReady = ready;
   if (typeof rangeCount === 'number') device.uwbRangeCount = rangeCount;
   if (typeof diagnostics?.uartBytes === 'number') device.uwbUartBytes = diagnostics.uartBytes;
+  if (typeof diagnostics?.discardedBytes === 'number') device.uwbDiscardedBytes = diagnostics.discardedBytes;
   if (typeof diagnostics?.parsedFrames === 'number') device.uwbParsedFrames = diagnostics.parsedFrames;
   if (typeof diagnostics?.invalidFrames === 'number') device.uwbInvalidFrames = diagnostics.invalidFrames;
   if (typeof diagnostics?.parsedLines === 'number') device.uwbParsedLines = diagnostics.parsedLines;
   if (typeof diagnostics?.invalidLines === 'number') device.uwbInvalidLines = diagnostics.invalidLines;
   if (typeof diagnostics?.lastByteAtMs === 'number') device.uwbLastByteAtMs = diagnostics.lastByteAtMs;
+  if (typeof diagnostics?.lastRxHex === 'string') device.uwbLastRxHex = diagnostics.lastRxHex;
   device.lastHeartbeat = new Date().toISOString();
   devices.set(id, device);
 }
