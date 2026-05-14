@@ -293,6 +293,18 @@ class DeviceService {
     }
   }
 
+  static Future<bool> deleteScene(String sceneId) async {
+    try {
+      final response = await http
+          .delete(Uri.parse('$baseUrl/scenes/$sceneId'))
+          .timeout(const Duration(seconds: 5));
+      return response.statusCode == 200;
+    } catch (e) {
+      print('[DEVICE_SERVICE] Error deleting scene: $e');
+      return false;
+    }
+  }
+
   static Future<bool> assignDeviceZone(String deviceId, String zoneId) async {
     try {
       final response = await http

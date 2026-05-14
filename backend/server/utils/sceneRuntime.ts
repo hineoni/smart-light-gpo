@@ -159,6 +159,10 @@ export function listScenes() {
   return Array.from(scenes.values()).sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
 }
 
+export function deleteScene(sceneId: string) {
+  return scenes.delete(sceneId);
+}
+
 export function saveScene(input: { name: string; zoneId?: string }) {
   ensureDefaultZones();
   const timestamp = nowIso();
