@@ -300,6 +300,11 @@ class _PositioningPainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
+    if (nodes.length == 2) {
+      _paintTwoNodeRuler(canvas, size);
+      return;
+    }
+
     final positions = _positionsFor(size);
     final linePaint = Paint()
       ..color = colorScheme.outline
@@ -361,6 +366,104 @@ class _PositioningPainter extends CustomPainter {
               math.sin(-math.pi / 2 + i * 2 * math.pi / nodes.length) * radius,
         ),
     };
+  }
+
+  void _paintTwoNodeRuler(Canvas canvas, Size size) {
+    final distance = distances
+        .where(
+          (item) =>
+              nodes.any((node) => node.deviceId == item.fromDeviceId) &&
+              nodes.any((node) => node.deviceId == item.toDeviceId),
+        )
+        .firstOrNull;
+    final fromNode = distance == null
+        ? nodes.first
+        : nodes.firstWhere((node) => node.deviceId == distance.fromDeviceId);
+    final toNode = distance == null
+        ? nodes.last
+        : nodes.firstWhere((node) => node.deviceId == distance.toDeviceId);
+
+    final left = Offset(size.width * 0.24, size.height * 0.48);
+    final right = Offset(size.width * 0.76, size.height * 0.48);
+    final linePaint = Paint()
+      ..color = colorScheme.primary.withValues(alpha: 0.75)
+      ..strokeWidth = 5
+      ..strokeCap = StrokeCap.round;
+    final tickPaint = Paint()
+      ..color = colorScheme.outline
+      ..strokeWidth = 2
+      ..strokeCap = StrokeCap.round;
+
+    canvas.drawLine(left, right, linePaint);
+    for (var i = 0; i <= 4; i++) {
+      final x = left.dx + (right.dx - left.dx) * i / 4;
+      canvas.drawLine(
+        Offset(x, left.dy - 10),
+        Offset(x, left.dy + 10),
+        tickPaint,
+      );
+    }
+
+    if (distance != null) {
+      final label = '${distance.distanceM.toStringAsFixed(2)} м';
+      final bubbleStyle = textStyle.copyWith(
+        color: colorScheme.onPrimaryContainer,
+        fontWeight: FontWeight.w700,
+      );
+      final textPainter = TextPainter(
+        text: TextSpan(text: label, style: bubbleStyle),
+        maxLines: 1,
+        textAlign: TextAlign.center,
+        textDirection: TextDirection.ltr,
+      )..layout();
+      final bubbleCenter = Offset(size.width / 2, left.dy - 42);
+      final bubbleRect = Rect.fromCenter(
+        center: bubbleCenter,
+        width: textPainter.width + 24,
+        height: textPainter.height + 14,
+      );
+      final bubblePaint = Paint()..color = colorScheme.primaryContainer;
+      canvas.drawRRect(
+        RRect.fromRectAndRadius(bubbleRect, const Radius.circular(8)),
+        bubblePaint,
+      );
+      textPainter.paint(
+        canvas,
+        bubbleRect.center - Offset(textPainter.width / 2, textPainter.height / 2),
+      );
+    }
+
+    _drawNode(canvas, left, fromNode);
+    _drawNode(canvas, right, toNode);
+    _drawText(
+      canvas,
+      labels[fromNode.deviceId] ?? fromNode.deviceId,
+      left + const Offset(0, 42),
+      textStyle.copyWith(color: colorScheme.onSurface),
+    );
+    _drawText(
+      canvas,
+      labels[toNode.deviceId] ?? toNode.deviceId,
+      right + const Offset(0, 42),
+      textStyle.copyWith(color: colorScheme.onSurface),
+    );
+  }
+
+  void _drawNode(Canvas canvas, Offset center, PositioningNodeModel node) {
+    final fill = Paint()
+      ..color = node.online ? colorScheme.primary : colorScheme.secondary;
+    final border = Paint()
+      ..color = colorScheme.surface
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 4;
+
+    canvas.drawCircle(center, 24, fill);
+    canvas.drawCircle(center, 24, border);
+    final iconStyle = textStyle.copyWith(
+      color: colorScheme.onPrimary,
+      fontWeight: FontWeight.w800,
+    );
+    _drawText(canvas, node.online ? 'ON' : 'OFF', center, iconStyle);
   }
 
   void _drawText(Canvas canvas, String text, Offset center, TextStyle style) {
