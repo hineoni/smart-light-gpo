@@ -95,14 +95,15 @@ static esp_err_t send_json_message(cJSON* json)
     
     // Пробуем отправить с retry
     for (int i = 0; i < retry_count; i++) {
-        ret = esp_websocket_client_send_text(s_websocket_client, json_string, msg_len, pdMS_TO_TICKS(1000));
+        int sent = esp_websocket_client_send_text(s_websocket_client, json_string, msg_len, pdMS_TO_TICKS(1000));
         
-        if (ret == ESP_OK) {
-            ESP_LOGD(TAG, "Message sent successfully on attempt %d", i + 1);
+        if (sent >= 0) {
+            ret = ESP_OK;
+            ESP_LOGD(TAG, "Message sent successfully on attempt %d (%d bytes)", i + 1, sent);
             break;
         } else {
-            ESP_LOGW(TAG, "Send attempt %d failed: %s (error code 0x%x)", 
-                     i + 1, esp_err_to_name(ret), ret);
+            ret = ESP_FAIL;
+            ESP_LOGW(TAG, "Send attempt %d failed: send_text returned %d", i + 1, sent);
             
             if (i < retry_count - 1) {
                 ESP_LOGD(TAG, "Retrying in 100ms...");
