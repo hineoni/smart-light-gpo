@@ -32,6 +32,7 @@ static device_config_t g_device_config = {0};
 
 // Флаги состояния
 static bool g_websocket_started = false;
+static TickType_t g_websocket_started_at = 0;
 
 static bool configure_uwb_for_device(uwb_positioning_config_t *uwb_config)
 {
@@ -214,6 +215,7 @@ static void connection_monitor_task(void *pvParameters)
                 ws_ret = websocket_client_start();
                 if (ws_ret == ESP_OK) {
                     g_websocket_started = true;
+                    g_websocket_started_at = xTaskGetTickCount();
                     ESP_LOGI(TAG, "WebSocket client started successfully");
                 } else {
                     ESP_LOGE(TAG, "Failed to start WebSocket client: %s", esp_err_to_name(ws_ret));
@@ -238,7 +240,8 @@ static void connection_monitor_task(void *pvParameters)
             g_websocket_started = false;
         }
 
-        if (g_websocket_started && wifi_state == WIFI_STATE_CONNECTED && !websocket_client_is_connected()) {
+        if (g_websocket_started && wifi_state == WIFI_STATE_CONNECTED && !websocket_client_is_connected() &&
+            (xTaskGetTickCount() - g_websocket_started_at) > pdMS_TO_TICKS(15000)) {
             ESP_LOGW(TAG, "WebSocket disconnected while WiFi is connected, restarting client");
             websocket_client_stop();
             websocket_client_deinit();
