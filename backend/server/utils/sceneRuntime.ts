@@ -230,6 +230,42 @@ export function deleteScene(sceneId: string) {
   return deleted;
 }
 
+export function updateScene(sceneId: string, input: { name?: string; zoneId?: string | null }) {
+  ensureDefaultZones();
+  const scene = scenes.get(sceneId);
+  if (!scene) {
+    throw new Error(`Scene ${sceneId} not found`);
+  }
+
+  const timestamp = nowIso();
+  const nextZoneId = input.zoneId === null ? undefined : input.zoneId ?? scene.zoneId;
+  if (nextZoneId && !zones.has(nextZoneId)) {
+    throw new Error(`Zone ${nextZoneId} not found`);
+  }
+
+  const updated: LightScene = {
+    ...scene,
+    name: typeof input.name === 'string' && input.name.trim().length > 0
+      ? input.name.trim()
+      : scene.name,
+    zoneId: nextZoneId,
+    devices: scene.devices.map(deviceState => {
+      const zone = nextZoneId ? zones.get(nextZoneId) : undefined;
+      return {
+        ...deviceState,
+        zoneId: nextZoneId,
+        x: zone?.x ?? deviceState.x,
+        y: zone?.y ?? deviceState.y,
+        heightM: zone?.heightM ?? deviceState.heightM,
+      };
+    }),
+    updatedAt: timestamp,
+  };
+  scenes.set(sceneId, updated);
+  saveState();
+  return updated;
+}
+
 export function saveScene(input: { name: string; zoneId?: string }) {
   ensureDefaultZones();
   const timestamp = nowIso();
@@ -246,6 +282,34 @@ export function saveScene(input: { name: string; zoneId?: string }) {
   scenes.set(id, scene);
   saveState();
   return scene;
+}
+
+export function deleteZone(zoneId: string) {
+  ensureDefaultZones();
+  const deleted = zones.delete(zoneId);
+  if (!deleted) return false;
+
+  for (const [deviceId, assignedZoneId] of deviceZoneIds.entries()) {
+    if (assignedZoneId === zoneId) {
+      deviceZoneIds.delete(deviceId);
+    }
+  }
+
+  for (const [sceneId, scene] of scenes.entries()) {
+    if (scene.zoneId !== zoneId && scene.devices.every(device => device.zoneId !== zoneId)) {
+      continue;
+    }
+
+    scenes.set(sceneId, {
+      ...scene,
+      zoneId: scene.zoneId === zoneId ? undefined : scene.zoneId,
+      devices: scene.devices.map(device => device.zoneId === zoneId ? { ...device, zoneId: undefined } : device),
+      updatedAt: nowIso(),
+    });
+  }
+
+  saveState();
+  return true;
 }
 
 export function applyScene(sceneId: string) {

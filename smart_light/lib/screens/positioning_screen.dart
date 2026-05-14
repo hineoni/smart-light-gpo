@@ -145,10 +145,13 @@ class _PositioningScreenState extends State<PositioningScreen> {
 
   Widget _buildScenesPanel(BuildContext context) {
     final theme = Theme.of(context);
+    final zoneName = _selectedZoneId == null
+        ? 'Без зоны'
+        : _zoneName(_selectedZoneId);
 
     return Card(
       child: Padding(
-        padding: const EdgeInsets.all(12),
+        padding: const EdgeInsets.all(14),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -164,76 +167,133 @@ class _PositioningScreenState extends State<PositioningScreen> {
                     ),
                   ),
                 ),
-                FilledButton.icon(
+                IconButton(
+                  icon: const Icon(Icons.tune),
+                  tooltip: 'Зоны',
+                  onPressed: _showZonesSheet,
+                ),
+                IconButton.filled(
                   icon: _isSavingScene
                       ? const SizedBox(
-                          width: 16,
-                          height: 16,
+                          width: 18,
+                          height: 18,
                           child: CircularProgressIndicator(strokeWidth: 2),
                         )
-                      : const Icon(Icons.bookmark_add_outlined),
-                  label: const Text('Сохранить'),
-                  onPressed: _isSavingScene ? null : _saveCurrentScene,
+                      : const Icon(Icons.add),
+                  tooltip: 'Новая сцена',
+                  onPressed: _isSavingScene ? null : _showSaveSceneSheet,
                 ),
               ],
             ),
+            const SizedBox(height: 4),
             Text(
-              'Сцена сохраняет цвет, яркость, углы сервоприводов, выбранную зону и текущий снимок расположения.',
+              'Сохраняет цвет, яркость, сервоприводы и привязку к зоне.',
               style: theme.textTheme.bodySmall,
             ),
             const SizedBox(height: 12),
-            if (_zones.isNotEmpty)
-              DropdownButtonFormField<String>(
-                initialValue: _selectedZoneId,
-                decoration: const InputDecoration(
-                  labelText: 'Зона для новой сцены',
-                  border: OutlineInputBorder(),
+            InkWell(
+              borderRadius: BorderRadius.circular(8),
+              onTap: _showZonesSheet,
+              child: Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 10,
                 ),
-                items: _zones
-                    .map(
-                      (zone) => DropdownMenuItem(
-                        value: zone.id,
-                        child: Text(
-                          '${zone.name}${zone.heightM == null ? '' : ' · ${zone.heightM!.toStringAsFixed(1)} м'}',
-                        ),
+                decoration: BoxDecoration(
+                  color: theme.colorScheme.surfaceContainerHighest,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.location_on_outlined, size: 20),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'Зона для новых сцен: $zoneName',
+                        style: theme.textTheme.bodyMedium,
                       ),
-                    )
-                    .toList(),
-                onChanged: (value) => setState(() => _selectedZoneId = value),
+                    ),
+                    const Icon(Icons.chevron_right),
+                  ],
+                ),
               ),
+            ),
             const SizedBox(height: 12),
             if (_scenes.isEmpty)
-              Text(
-                'Сохраненных сцен пока нет',
-                style: theme.textTheme.bodySmall,
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(
+                  border: Border.all(color: theme.colorScheme.outlineVariant),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Text(
+                  'Сцен пока нет. Нажми + и дай сцене понятное имя.',
+                  style: theme.textTheme.bodySmall,
+                ),
               )
             else
-              ..._scenes.take(4).map((scene) {
-                final zoneName = _zones
-                    .where((zone) => zone.id == scene.zoneId)
-                    .map((zone) => zone.name)
-                    .firstOrNull;
-                return ListTile(
-                  contentPadding: EdgeInsets.zero,
-                  leading: const Icon(Icons.light_mode_outlined),
-                  title: Text(scene.name),
-                  subtitle: Text(
-                    '${scene.devices.length} плат${zoneName == null ? '' : ' · $zoneName'}',
+              ..._scenes.map((scene) {
+                final sceneZoneName = _zoneName(scene.zoneId);
+                return Container(
+                  margin: const EdgeInsets.only(bottom: 8),
+                  decoration: BoxDecoration(
+                    border: Border.all(color: theme.colorScheme.outlineVariant),
+                    borderRadius: BorderRadius.circular(8),
                   ),
-                  trailing: Wrap(
-                    spacing: 4,
-                    children: [
-                      IconButton(
-                        icon: const Icon(Icons.play_arrow),
-                        tooltip: 'Применить сцену',
-                        onPressed: () => _applyScene(scene.id),
+                  child: ListTile(
+                    leading: CircleAvatar(
+                      backgroundColor: theme.colorScheme.primaryContainer,
+                      child: Icon(
+                        Icons.light_mode_outlined,
+                        color: theme.colorScheme.onPrimaryContainer,
                       ),
-                      IconButton(
-                        icon: const Icon(Icons.delete_outline),
-                        tooltip: 'Удалить сцену',
-                        onPressed: () => _deleteScene(scene),
-                      ),
-                    ],
+                    ),
+                    title: Text(
+                      scene.name,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    subtitle: Text(
+                      '${scene.devices.length} плат · $sceneZoneName · ${_sceneBrightnessLabel(scene)} · ${_sceneUpdatedLabel(scene)}',
+                    ),
+                    trailing: Wrap(
+                      spacing: 2,
+                      children: [
+                        IconButton(
+                          icon: const Icon(Icons.play_arrow),
+                          tooltip: 'Применить',
+                          onPressed: () => _applyScene(scene.id),
+                        ),
+                        PopupMenuButton<String>(
+                          tooltip: 'Действия',
+                          onSelected: (value) {
+                            if (value == 'edit') {
+                              _showEditSceneSheet(scene);
+                            } else if (value == 'delete') {
+                              _deleteScene(scene);
+                            }
+                          },
+                          itemBuilder: (context) => const [
+                            PopupMenuItem(
+                              value: 'edit',
+                              child: ListTile(
+                                leading: Icon(Icons.edit_outlined),
+                                title: Text('Переименовать'),
+                              ),
+                            ),
+                            PopupMenuItem(
+                              value: 'delete',
+                              child: ListTile(
+                                leading: Icon(Icons.delete_outline),
+                                title: Text('Удалить'),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
                   ),
                 );
               }),
@@ -243,15 +303,246 @@ class _PositioningScreenState extends State<PositioningScreen> {
     );
   }
 
-  Future<void> _saveCurrentScene() async {
-    setState(() => _isSavingScene = true);
-    final scene = await DeviceService.saveScene(
-      'Сцена ${DateTime.now().hour.toString().padLeft(2, '0')}:${DateTime.now().minute.toString().padLeft(2, '0')}',
-      zoneId: _selectedZoneId,
+  String _zoneName(String? zoneId) {
+    if (zoneId == null || zoneId.isEmpty) return 'Без зоны';
+    return _zones
+            .where((zone) => zone.id == zoneId)
+            .map((zone) => zone.name)
+            .firstOrNull ??
+        'Зона удалена';
+  }
+
+  String _sceneUpdatedLabel(LightSceneModel scene) {
+    final updatedAt = scene.updatedAt;
+    if (updatedAt == null) return 'без даты';
+    return '${updatedAt.day.toString().padLeft(2, '0')}.'
+        '${updatedAt.month.toString().padLeft(2, '0')} '
+        '${updatedAt.hour.toString().padLeft(2, '0')}:'
+        '${updatedAt.minute.toString().padLeft(2, '0')}';
+  }
+
+  String _sceneBrightnessLabel(LightSceneModel scene) {
+    if (scene.devices.isEmpty) return 'нет устройств';
+    final avg =
+        scene.devices
+            .map(
+              (device) => device.brightness <= 1
+                  ? device.brightness * 255
+                  : device.brightness,
+            )
+            .reduce((a, b) => a + b) /
+        scene.devices.length;
+    return '${((avg / 255) * 100).round()}%';
+  }
+
+  Future<void> _showSaveSceneSheet() async {
+    final nameController = TextEditingController(
+      text:
+          'Сцена ${DateTime.now().hour.toString().padLeft(2, '0')}:${DateTime.now().minute.toString().padLeft(2, '0')}',
+    );
+    String? zoneId = _selectedZoneId;
+
+    final result = await showModalBottomSheet<({String name, String? zoneId})>(
+      context: context,
+      isScrollControlled: true,
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setModalState) {
+            return Padding(
+              padding: EdgeInsets.fromLTRB(
+                16,
+                16,
+                16,
+                16 + MediaQuery.of(context).viewInsets.bottom,
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Новая сцена',
+                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: nameController,
+                    autofocus: true,
+                    decoration: const InputDecoration(
+                      labelText: 'Название',
+                      border: OutlineInputBorder(),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  DropdownButtonFormField<String?>(
+                    initialValue: zoneId,
+                    decoration: const InputDecoration(
+                      labelText: 'Зона',
+                      border: OutlineInputBorder(),
+                    ),
+                    items: [
+                      const DropdownMenuItem<String?>(
+                        value: null,
+                        child: Text('Без зоны'),
+                      ),
+                      ..._zones.map(
+                        (zone) => DropdownMenuItem<String?>(
+                          value: zone.id,
+                          child: Text(zone.name),
+                        ),
+                      ),
+                    ],
+                    onChanged: (value) => setModalState(() => zoneId = value),
+                  ),
+                  const SizedBox(height: 16),
+                  Row(
+                    children: [
+                      TextButton(
+                        onPressed: () => Navigator.of(context).pop(),
+                        child: const Text('Отмена'),
+                      ),
+                      const Spacer(),
+                      FilledButton.icon(
+                        icon: const Icon(Icons.bookmark_add_outlined),
+                        label: const Text('Сохранить'),
+                        onPressed: () {
+                          final name = nameController.text.trim();
+                          if (name.isEmpty) return;
+                          Navigator.of(
+                            context,
+                          ).pop((name: name, zoneId: zoneId));
+                        },
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
+    nameController.dispose();
+
+    if (result == null) return;
+    await _saveCurrentScene(result.name, result.zoneId);
+  }
+
+  Future<void> _showEditSceneSheet(LightSceneModel scene) async {
+    final nameController = TextEditingController(text: scene.name);
+    String? zoneId = scene.zoneId;
+
+    final result = await showModalBottomSheet<({String name, String? zoneId})>(
+      context: context,
+      isScrollControlled: true,
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setModalState) {
+            return Padding(
+              padding: EdgeInsets.fromLTRB(
+                16,
+                16,
+                16,
+                16 + MediaQuery.of(context).viewInsets.bottom,
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Редактировать сцену',
+                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: nameController,
+                    autofocus: true,
+                    decoration: const InputDecoration(
+                      labelText: 'Название',
+                      border: OutlineInputBorder(),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  DropdownButtonFormField<String?>(
+                    initialValue: zoneId,
+                    decoration: const InputDecoration(
+                      labelText: 'Зона',
+                      border: OutlineInputBorder(),
+                    ),
+                    items: [
+                      const DropdownMenuItem<String?>(
+                        value: null,
+                        child: Text('Без зоны'),
+                      ),
+                      ..._zones.map(
+                        (zone) => DropdownMenuItem<String?>(
+                          value: zone.id,
+                          child: Text(zone.name),
+                        ),
+                      ),
+                    ],
+                    onChanged: (value) => setModalState(() => zoneId = value),
+                  ),
+                  const SizedBox(height: 16),
+                  Row(
+                    children: [
+                      TextButton(
+                        onPressed: () => Navigator.of(context).pop(),
+                        child: const Text('Отмена'),
+                      ),
+                      const Spacer(),
+                      FilledButton(
+                        onPressed: () {
+                          final name = nameController.text.trim();
+                          if (name.isEmpty) return;
+                          Navigator.of(
+                            context,
+                          ).pop((name: name, zoneId: zoneId));
+                        },
+                        child: const Text('Сохранить'),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
+    nameController.dispose();
+
+    if (result == null) return;
+    final updated = await DeviceService.updateScene(
+      scene.id,
+      name: result.name,
+      zoneId: result.zoneId,
+      clearZone: result.zoneId == null,
     );
     if (!mounted) return;
+    await _loadData(showLoader: false);
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          updated == null ? 'Не удалось обновить сцену' : 'Сцена обновлена',
+        ),
+      ),
+    );
+  }
 
-    setState(() => _isSavingScene = false);
+  Future<void> _saveCurrentScene(String name, String? zoneId) async {
+    setState(() => _isSavingScene = true);
+    final scene = await DeviceService.saveScene(name, zoneId: zoneId);
+    if (!mounted) return;
+
+    setState(() {
+      _isSavingScene = false;
+      _selectedZoneId = zoneId;
+    });
     if (scene == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Не удалось сохранить сцену')),
@@ -264,6 +555,219 @@ class _PositioningScreenState extends State<PositioningScreen> {
     ScaffoldMessenger.of(
       context,
     ).showSnackBar(SnackBar(content: Text('Сцена "${scene.name}" сохранена')));
+  }
+
+  Future<void> _showZonesSheet() async {
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      builder: (context) {
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Text(
+                      'Зоны',
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    const Spacer(),
+                    IconButton.filled(
+                      icon: const Icon(Icons.add),
+                      tooltip: 'Добавить зону',
+                      onPressed: () async {
+                        Navigator.of(context).pop();
+                        await _showZoneEditor();
+                      },
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                ..._zones.map(
+                  (zone) => ListTile(
+                    leading: Icon(
+                      _selectedZoneId == zone.id
+                          ? Icons.radio_button_checked
+                          : Icons.radio_button_unchecked,
+                    ),
+                    title: Text(zone.name),
+                    subtitle: Text(
+                      'x ${zone.x.toStringAsFixed(2)} · y ${zone.y.toStringAsFixed(2)}'
+                      '${zone.heightM == null ? '' : ' · ${zone.heightM!.toStringAsFixed(1)} м'}',
+                    ),
+                    trailing: PopupMenuButton<String>(
+                      onSelected: (value) async {
+                        Navigator.of(context).pop();
+                        if (value == 'edit') {
+                          await _showZoneEditor(zone: zone);
+                        } else if (value == 'delete') {
+                          await _deleteZone(zone);
+                        }
+                      },
+                      itemBuilder: (context) => const [
+                        PopupMenuItem(
+                          value: 'edit',
+                          child: ListTile(
+                            leading: Icon(Icons.edit_outlined),
+                            title: Text('Изменить'),
+                          ),
+                        ),
+                        PopupMenuItem(
+                          value: 'delete',
+                          child: ListTile(
+                            leading: Icon(Icons.delete_outline),
+                            title: Text('Удалить'),
+                          ),
+                        ),
+                      ],
+                    ),
+                    onTap: () {
+                      setState(() => _selectedZoneId = zone.id);
+                      Navigator.of(context).pop();
+                    },
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Future<void> _showZoneEditor({RoomZoneModel? zone}) async {
+    final nameController = TextEditingController(text: zone?.name ?? '');
+    double x = zone?.x ?? 0.5;
+    double y = zone?.y ?? 0.5;
+    double height = zone?.heightM ?? 1.4;
+
+    final result =
+        await showModalBottomSheet<
+          ({String name, double x, double y, double height})
+        >(
+          context: context,
+          isScrollControlled: true,
+          builder: (context) {
+            return StatefulBuilder(
+              builder: (context, setModalState) {
+                return Padding(
+                  padding: EdgeInsets.fromLTRB(
+                    16,
+                    16,
+                    16,
+                    16 + MediaQuery.of(context).viewInsets.bottom,
+                  ),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        zone == null ? 'Новая зона' : 'Редактировать зону',
+                        style: Theme.of(context).textTheme.titleMedium
+                            ?.copyWith(fontWeight: FontWeight.w600),
+                      ),
+                      const SizedBox(height: 12),
+                      TextField(
+                        controller: nameController,
+                        autofocus: true,
+                        decoration: const InputDecoration(
+                          labelText: 'Название',
+                          border: OutlineInputBorder(),
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      Text('Положение X: ${x.toStringAsFixed(2)}'),
+                      Slider(
+                        value: x,
+                        onChanged: (value) => setModalState(() => x = value),
+                      ),
+                      Text('Положение Y: ${y.toStringAsFixed(2)}'),
+                      Slider(
+                        value: y,
+                        onChanged: (value) => setModalState(() => y = value),
+                      ),
+                      Text('Высота: ${height.toStringAsFixed(1)} м'),
+                      Slider(
+                        value: height,
+                        min: 0,
+                        max: 3,
+                        divisions: 30,
+                        onChanged: (value) =>
+                            setModalState(() => height = value),
+                      ),
+                      const SizedBox(height: 12),
+                      Row(
+                        children: [
+                          TextButton(
+                            onPressed: () => Navigator.of(context).pop(),
+                            child: const Text('Отмена'),
+                          ),
+                          const Spacer(),
+                          FilledButton(
+                            onPressed: () {
+                              final name = nameController.text.trim();
+                              if (name.isEmpty) return;
+                              Navigator.of(
+                                context,
+                              ).pop((name: name, x: x, y: y, height: height));
+                            },
+                            child: const Text('Сохранить'),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                );
+              },
+            );
+          },
+        );
+    nameController.dispose();
+
+    if (result == null) return;
+    final saved = await DeviceService.saveZone(
+      id: zone?.id,
+      name: result.name,
+      x: result.x,
+      y: result.y,
+      heightM: result.height,
+    );
+    if (!mounted) return;
+    await _loadData(showLoader: false);
+    if (!mounted) return;
+    if (saved != null) {
+      setState(() => _selectedZoneId = saved.id);
+    }
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          saved == null ? 'Не удалось сохранить зону' : 'Зона сохранена',
+        ),
+      ),
+    );
+  }
+
+  Future<void> _deleteZone(RoomZoneModel zone) async {
+    final ok = await DeviceService.deleteZone(zone.id);
+    if (!mounted) return;
+    if (_selectedZoneId == zone.id) {
+      setState(() => _selectedZoneId = null);
+    }
+    await _loadData(showLoader: false);
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          ok ? 'Зона "${zone.name}" удалена' : 'Не удалось удалить зону',
+        ),
+      ),
+    );
   }
 
   Future<void> _applyScene(String sceneId) async {
