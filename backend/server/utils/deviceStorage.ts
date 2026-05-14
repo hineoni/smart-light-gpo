@@ -11,6 +11,8 @@ interface DeviceConfig {
   colorG?: number;
   colorB?: number;
   lastHeartbeat?: string; // ISO
+  uwbReady?: boolean;
+  uwbRangeCount?: number;
 }
 
 let devices: Map<string, DeviceConfig> = new Map();
@@ -73,6 +75,15 @@ export function updateDeviceLed(id: string, brightness?: number, r?: number, g?:
   if (typeof r === 'number') device.colorR = r;
   if (typeof g === 'number') device.colorG = g;
   if (typeof b === 'number') device.colorB = b;
+  device.lastHeartbeat = new Date().toISOString();
+  devices.set(id, device);
+}
+
+export function updateDeviceUwbStatus(id: string, ready?: boolean, rangeCount?: number) {
+  const device = devices.get(id);
+  if (!device) return;
+  if (typeof ready === 'boolean') device.uwbReady = ready;
+  if (typeof rangeCount === 'number') device.uwbRangeCount = rangeCount;
   device.lastHeartbeat = new Date().toISOString();
   devices.set(id, device);
 }

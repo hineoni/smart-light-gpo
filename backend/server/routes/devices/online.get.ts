@@ -10,7 +10,9 @@ export default defineEventHandler(() => {
       ip: dev?.ip,
       lastHeartbeat: d.lastHeartbeat,
       servo1Angle: d.servo1Angle,
-      servo2Angle: d.servo2Angle
+      servo2Angle: d.servo2Angle,
+      uwbReady: d.uwbReady,
+      uwbRangeCount: d.uwbRangeCount,
     };
   });
   return list;

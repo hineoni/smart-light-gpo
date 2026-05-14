@@ -168,6 +168,8 @@ class _PositioningScreenState extends State<PositioningScreen> {
                   deviceId: device.id,
                   online: false,
                   lastSeenAt: null,
+                  uwbReady: null,
+                  uwbRangeCount: null,
                 ),
               )
               .take(3)
@@ -206,18 +208,33 @@ class _PositioningScreenState extends State<PositioningScreen> {
   }
 
   Widget _buildEmptyState() {
-    return const Padding(
-      padding: EdgeInsets.only(top: 80),
+    final hasUwbHeartbeat = _summary.nodes.any(
+      (node) => node.uwbReady != null || node.uwbRangeCount != null,
+    );
+    final uwbStatus = hasUwbHeartbeat
+        ? _summary.nodes
+              .map(
+                (node) =>
+                    '${_nodeLabel(node.deviceId)}: UWB ${node.uwbReady == true ? 'ready' : 'not ready'}, ranges ${node.uwbRangeCount ?? 0}',
+              )
+              .join('\n')
+        : 'UWB-статус пока не пришел в heartbeat';
+
+    return Padding(
+      padding: const EdgeInsets.only(top: 80),
       child: Column(
         children: [
-          Icon(Icons.social_distance, size: 64, color: Colors.grey),
-          SizedBox(height: 16),
-          Text('Расстояния пока не получены', style: TextStyle(fontSize: 18)),
-          SizedBox(height: 8),
+          const Icon(Icons.social_distance, size: 64, color: Colors.grey),
+          const SizedBox(height: 16),
+          const Text(
+            'Расстояния пока не получены',
+            style: TextStyle(fontSize: 18),
+          ),
+          const SizedBox(height: 8),
           Text(
-            'Данные появятся после heartbeat от UWB-модулей',
+            '$uwbStatus\nДанные появятся, когда UWB-модуль отдаст range-фрейм',
             textAlign: TextAlign.center,
-            style: TextStyle(fontSize: 12, color: Colors.grey),
+            style: const TextStyle(fontSize: 12, color: Colors.grey),
           ),
         ],
       ),

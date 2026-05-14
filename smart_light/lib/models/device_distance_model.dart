@@ -34,11 +34,15 @@ class PositioningNodeModel {
   final String deviceId;
   final bool online;
   final DateTime? lastSeenAt;
+  final bool? uwbReady;
+  final int? uwbRangeCount;
 
   const PositioningNodeModel({
     required this.deviceId,
     required this.online,
     required this.lastSeenAt,
+    required this.uwbReady,
+    required this.uwbRangeCount,
   });
 
   factory PositioningNodeModel.fromJson(Map<String, dynamic> json) {
@@ -46,6 +50,10 @@ class PositioningNodeModel {
       deviceId: json['deviceId'] ?? '',
       online: json['online'] == true,
       lastSeenAt: DateTime.tryParse(json['lastSeenAt'] ?? ''),
+      uwbReady: json['uwbReady'] is bool ? json['uwbReady'] as bool : null,
+      uwbRangeCount: json['uwbRangeCount'] is num
+          ? (json['uwbRangeCount'] as num).round()
+          : null,
     );
   }
 }
@@ -94,6 +102,8 @@ class PositioningSummaryModel {
               deviceId: id,
               online: false,
               lastSeenAt: null,
+              uwbReady: null,
+              uwbRangeCount: null,
             ),
           )
           .toList(),

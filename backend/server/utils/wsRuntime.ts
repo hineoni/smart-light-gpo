@@ -4,6 +4,8 @@ interface RuntimeEntry {
   lastHeartbeat: number;
   servo1Angle?: number;
   servo2Angle?: number;
+  uwbReady?: boolean;
+  uwbRangeCount?: number;
 }
 
 const runtime: Map<string, RuntimeEntry> = new Map(); // key: peer.id
@@ -16,12 +18,19 @@ export function unregisterPeer(peerId: string) {
   runtime.delete(peerId);
 }
 
-export function updateHeartbeat(peerId: string, s1?: number, s2?: number) {
+export function updateHeartbeat(
+  peerId: string,
+  s1?: number,
+  s2?: number,
+  uwb?: { ready?: boolean; rangeCount?: number }
+) {
   const entry = runtime.get(peerId);
   if (!entry) return null;
   entry.lastHeartbeat = Date.now();
   if (typeof s1 === 'number') entry.servo1Angle = s1;
   if (typeof s2 === 'number') entry.servo2Angle = s2;
+  if (typeof uwb?.ready === 'boolean') entry.uwbReady = uwb.ready;
+  if (typeof uwb?.rangeCount === 'number') entry.uwbRangeCount = uwb.rangeCount;
   return entry;
 }
 
@@ -32,11 +41,25 @@ export function getRuntimeByDevice(deviceId: string) {
   return null;
 }
 
-export function onlineDevices(): Array<{ deviceId: string; lastHeartbeat: number; servo1Angle?: number; servo2Angle?: number }> {
+export function onlineDevices(): Array<{
+  deviceId: string;
+  lastHeartbeat: number;
+  servo1Angle?: number;
+  servo2Angle?: number;
+  uwbReady?: boolean;
+  uwbRangeCount?: number;
+}> {
   const now = Date.now();
   return Array.from(runtime.values())
     .filter(e => now - e.lastHeartbeat < 30000) // 30s window
-    .map(e => ({ deviceId: e.deviceId, lastHeartbeat: e.lastHeartbeat, servo1Angle: e.servo1Angle, servo2Angle: e.servo2Angle }));
+    .map(e => ({
+      deviceId: e.deviceId,
+      lastHeartbeat: e.lastHeartbeat,
+      servo1Angle: e.servo1Angle,
+      servo2Angle: e.servo2Angle,
+      uwbReady: e.uwbReady,
+      uwbRangeCount: e.uwbRangeCount,
+    }));
 }
 
 export function sendServoCommand(deviceId: string, servo: number, angle: number) {
