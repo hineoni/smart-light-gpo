@@ -11,11 +11,36 @@ interface HeartbeatMsg extends IncomingBase {
   uwb?: {
     ready?: boolean;
     rangeCount?: number;
+    uartBytes?: number;
+    parsedFrames?: number;
+    invalidFrames?: number;
+    parsedLines?: number;
+    invalidLines?: number;
+    lastByteAtMs?: number;
     ranges?: Array<{ peerId: string; distanceM: number; updatedAtMs?: number; rssiDbm?: number }>;
   };
 }
 
 type IncomingMessage = RegisterMsg | HeartbeatMsg | any;
+const heartbeatLogAtByPeer = new Map<string, number>();
+
+function logIncoming(peerId: string, payload: IncomingMessage) {
+  if (payload.type !== 'heartbeat') {
+    console.log(`[ws] incoming from ${peerId}:`, payload.type, payload);
+    return;
+  }
+
+  const now = Date.now();
+  const lastLogAt = heartbeatLogAtByPeer.get(peerId) ?? 0;
+  if (now - lastLogAt < 5000) return;
+
+  heartbeatLogAtByPeer.set(peerId, now);
+  console.log(`[ws] heartbeat from ${peerId}:`, {
+    servo1: payload.servo1,
+    servo2: payload.servo2,
+    uwb: payload.uwb,
+  });
+}
 
 export default defineWebSocketHandler({
   open(peer: any) {
@@ -31,7 +56,7 @@ export default defineWebSocketHandler({
       return;
     }
 
-    console.log(`[ws] incoming from ${peer.id}:`, payload.type, payload);
+    logIncoming(peer.id, payload);
 
     if (payload.type === 'register') {
       const { deviceId } = payload as RegisterMsg;
@@ -56,7 +81,7 @@ export default defineWebSocketHandler({
       const rt = updateHeartbeat(peer.id, payload.servo1?.angle, payload.servo2?.angle, payload.uwb);
       if (rt?.deviceId) {
         updateDeviceStatus(rt.deviceId, 'connected');
-        updateDeviceUwbStatus(rt.deviceId, payload.uwb?.ready, payload.uwb?.rangeCount);
+        updateDeviceUwbStatus(rt.deviceId, payload.uwb?.ready, payload.uwb?.rangeCount, payload.uwb);
         updateDeviceRanges(rt.deviceId, payload.uwb?.ranges);
       }
       peer.send(JSON.stringify({ type: 'ack', action: 'heartbeat' }));
@@ -68,6 +93,7 @@ export default defineWebSocketHandler({
   },
   close(peer: any) {
     console.log('[ws] close', peer.id);
+    heartbeatLogAtByPeer.delete(peer.id);
     unregisterPeer(peer.id);
   },
   error(peer: any, error: any) {

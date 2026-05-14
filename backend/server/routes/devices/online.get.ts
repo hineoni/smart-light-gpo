@@ -13,6 +13,12 @@ export default defineEventHandler(() => {
       servo2Angle: d.servo2Angle,
       uwbReady: d.uwbReady,
       uwbRangeCount: d.uwbRangeCount,
+      uwbUartBytes: d.uwbUartBytes,
+      uwbParsedFrames: d.uwbParsedFrames,
+      uwbInvalidFrames: d.uwbInvalidFrames,
+      uwbParsedLines: d.uwbParsedLines,
+      uwbInvalidLines: d.uwbInvalidLines,
+      uwbLastByteAtMs: d.uwbLastByteAtMs,
     };
   });
   return list;

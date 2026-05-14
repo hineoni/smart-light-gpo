@@ -27,10 +27,20 @@ typedef struct {
     int baud_rate;
 } uwb_positioning_config_t;
 
+typedef struct {
+    uint32_t total_bytes;
+    uint32_t parsed_frames;
+    uint32_t invalid_frames;
+    uint32_t parsed_lines;
+    uint32_t invalid_lines;
+    int64_t last_byte_at_ms;
+} uwb_positioning_stats_t;
+
 esp_err_t uwb_positioning_init(const uwb_positioning_config_t *config);
 void uwb_positioning_task(void);
 size_t uwb_positioning_get_ranges(uwb_range_t *ranges, size_t max_ranges);
 bool uwb_positioning_is_ready(void);
+void uwb_positioning_get_stats(uwb_positioning_stats_t *stats);
 
 #ifdef __cplusplus
 }
