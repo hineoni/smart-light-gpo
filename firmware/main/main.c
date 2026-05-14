@@ -237,6 +237,13 @@ static void connection_monitor_task(void *pvParameters)
             websocket_client_deinit();
             g_websocket_started = false;
         }
+
+        if (g_websocket_started && wifi_state == WIFI_STATE_CONNECTED && !websocket_client_is_connected()) {
+            ESP_LOGW(TAG, "WebSocket disconnected while WiFi is connected, restarting client");
+            websocket_client_stop();
+            websocket_client_deinit();
+            g_websocket_started = false;
+        }
         
         // Переключение в BLE provisioning режим если соединение не удалось
         if (wifi_state == WIFI_STATE_FAILED) {
