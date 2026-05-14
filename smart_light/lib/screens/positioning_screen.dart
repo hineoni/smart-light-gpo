@@ -385,10 +385,60 @@ class _PositioningScreenState extends State<PositioningScreen> {
                   fontWeight: FontWeight.w700,
                 ),
               ),
+              onTap: () => _showAimTargets(device),
             ),
           );
         }),
       ],
+    );
+  }
+
+  Future<void> _showAimTargets(DeviceModel source) async {
+    final targets = _devices.where((device) => device.id != source.id).toList();
+    if (targets.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Нет другой платы для наведения')),
+      );
+      return;
+    }
+
+    final target = await showModalBottomSheet<DeviceModel>(
+      context: context,
+      builder: (context) {
+        return SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              ListTile(
+                title: Text('Навести ${_deviceName(source.id)} на плату'),
+                subtitle: const Text('Выбери плату-маркер'),
+              ),
+              ...targets.map(
+                (device) => ListTile(
+                  leading: const Icon(Icons.my_location),
+                  title: Text(_deviceName(device.id)),
+                  onTap: () => Navigator.of(context).pop(device),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+
+    if (target == null) return;
+    final ok = await DeviceService.aimDeviceAtTarget(source.id, target.id);
+    if (!mounted) return;
+    await _loadData(showLoader: false);
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          ok
+              ? '${_deviceName(source.id)} наведена на ${_deviceName(target.id)}'
+              : 'Не удалось навести лампу',
+        ),
+      ),
     );
   }
 
