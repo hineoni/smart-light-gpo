@@ -460,6 +460,12 @@ esp_err_t websocket_client_send_heartbeat(void)
         cJSON_AddNumberToObject(uwb, "invalidLines", uwb_stats.invalid_lines);
         cJSON_AddNumberToObject(uwb, "lastByteAtMs", uwb_stats.last_byte_at_ms);
         cJSON_AddStringToObject(uwb, "lastRxHex", uwb_stats.last_rx_hex);
+        cJSON_AddBoolToObject(uwb, "autoConfig", uwb_stats.auto_config_enabled);
+        cJSON_AddNumberToObject(uwb, "role", uwb_stats.role);
+        cJSON_AddNumberToObject(uwb, "pid", uwb_stats.pid);
+        cJSON_AddNumberToObject(uwb, "period", uwb_stats.period);
+        cJSON_AddNumberToObject(uwb, "localAddress", uwb_stats.local_address);
+        cJSON_AddNumberToObject(uwb, "peer0Address", uwb_stats.peer0_address);
         cJSON_AddItemToObject(heartbeat_json, "uwb", uwb);
     } else {
         if (uwb != NULL) cJSON_Delete(uwb);

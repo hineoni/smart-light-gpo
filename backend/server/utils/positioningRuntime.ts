@@ -29,6 +29,12 @@ export interface PositioningNode {
   uwbInvalidLines?: number;
   uwbLastByteAtMs?: number;
   uwbLastRxHex?: string;
+  uwbAutoConfig?: boolean;
+  uwbRole?: number;
+  uwbPid?: number;
+  uwbPeriod?: number;
+  uwbLocalAddress?: number;
+  uwbPeer0Address?: number;
 }
 
 export interface PositioningSummary {
@@ -45,6 +51,10 @@ const distances: Map<string, StoredDeviceDistance> = new Map();
 
 function normalizePair(fromDeviceId: string, toDeviceId: string) {
   return [fromDeviceId, toDeviceId].sort().join('::');
+}
+
+function formatUwbPeerId(address: number) {
+  return `uwb_${address.toString(16).padStart(4, '0').toUpperCase()}`;
 }
 
 function normalizeRssi(rssiDbm: unknown) {
@@ -108,16 +118,47 @@ interface OnlineNodeInput {
   uwbInvalidLines?: number;
   uwbLastByteAtMs?: number;
   uwbLastRxHex?: string;
+  uwbAutoConfig?: boolean;
+  uwbRole?: number;
+  uwbPid?: number;
+  uwbPeriod?: number;
+  uwbLocalAddress?: number;
+  uwbPeer0Address?: number;
 }
 
 export function getPositioningSummary(onlineNodes: Array<string | OnlineNodeInput> = []): PositioningSummary {
-  const currentDistances = getDistances();
   const onlineByDeviceId = new Map<string, OnlineNodeInput>();
+  const deviceIdByUwbPeerId = new Map<string, string>();
 
   for (const node of onlineNodes) {
     const onlineNode = typeof node === 'string' ? { deviceId: node } : node;
     onlineByDeviceId.set(onlineNode.deviceId, onlineNode);
+    if (typeof onlineNode.uwbLocalAddress === 'number') {
+      deviceIdByUwbPeerId.set(formatUwbPeerId(onlineNode.uwbLocalAddress), onlineNode.deviceId);
+    }
   }
+
+  const currentDistancesByPair = new Map<string, DeviceDistance>();
+  for (const distance of getDistances()) {
+    const fromDeviceId = deviceIdByUwbPeerId.get(distance.fromDeviceId) ?? distance.fromDeviceId;
+    const toDeviceId = deviceIdByUwbPeerId.get(distance.toDeviceId) ?? distance.toDeviceId;
+    if (fromDeviceId === toDeviceId) {
+      continue;
+    }
+
+    const mappedDistance: DeviceDistance = {
+      ...distance,
+      fromDeviceId,
+      toDeviceId,
+    };
+    const key = normalizePair(fromDeviceId, toDeviceId);
+    const previous = currentDistancesByPair.get(key);
+    if (!previous || new Date(mappedDistance.updatedAt).getTime() > new Date(previous.updatedAt).getTime()) {
+      currentDistancesByPair.set(key, mappedDistance);
+    }
+  }
+  const currentDistances = Array.from(currentDistancesByPair.values())
+    .sort((a, b) => `${a.fromDeviceId}:${a.toDeviceId}`.localeCompare(`${b.fromDeviceId}:${b.toDeviceId}`));
 
   const nodeIds = new Set<string>(onlineByDeviceId.keys());
 
@@ -157,6 +198,12 @@ export function getPositioningSummary(onlineNodes: Array<string | OnlineNodeInpu
           uwbInvalidLines: onlineNode?.uwbInvalidLines,
           uwbLastByteAtMs: onlineNode?.uwbLastByteAtMs,
           uwbLastRxHex: onlineNode?.uwbLastRxHex,
+          uwbAutoConfig: onlineNode?.uwbAutoConfig,
+          uwbRole: onlineNode?.uwbRole,
+          uwbPid: onlineNode?.uwbPid,
+          uwbPeriod: onlineNode?.uwbPeriod,
+          uwbLocalAddress: onlineNode?.uwbLocalAddress,
+          uwbPeer0Address: onlineNode?.uwbPeer0Address,
         };
       }),
     lastUpdated,

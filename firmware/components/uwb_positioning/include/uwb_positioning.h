@@ -25,6 +25,12 @@ typedef struct {
     int tx_pin;
     int rx_pin;
     int baud_rate;
+    bool auto_config_enabled;
+    int role;
+    uint8_t pid;
+    uint8_t period;
+    uint16_t local_address;
+    uint16_t peer0_address;
 } uwb_positioning_config_t;
 
 typedef struct {
@@ -36,6 +42,12 @@ typedef struct {
     uint32_t invalid_lines;
     int64_t last_byte_at_ms;
     char last_rx_hex[96];
+    bool auto_config_enabled;
+    int role;
+    uint8_t pid;
+    uint8_t period;
+    uint16_t local_address;
+    uint16_t peer0_address;
 } uwb_positioning_stats_t;
 
 esp_err_t uwb_positioning_init(const uwb_positioning_config_t *config);

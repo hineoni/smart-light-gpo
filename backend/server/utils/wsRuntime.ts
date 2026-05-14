@@ -14,6 +14,12 @@ interface RuntimeEntry {
   uwbInvalidLines?: number;
   uwbLastByteAtMs?: number;
   uwbLastRxHex?: string;
+  uwbAutoConfig?: boolean;
+  uwbRole?: number;
+  uwbPid?: number;
+  uwbPeriod?: number;
+  uwbLocalAddress?: number;
+  uwbPeer0Address?: number;
 }
 
 const runtime: Map<string, RuntimeEntry> = new Map(); // key: peer.id
@@ -41,6 +47,12 @@ export function updateHeartbeat(
     invalidLines?: number;
     lastByteAtMs?: number;
     lastRxHex?: string;
+    autoConfig?: boolean;
+    role?: number;
+    pid?: number;
+    period?: number;
+    localAddress?: number;
+    peer0Address?: number;
   }
 ) {
   const entry = runtime.get(peerId);
@@ -58,6 +70,12 @@ export function updateHeartbeat(
   if (typeof uwb?.invalidLines === 'number') entry.uwbInvalidLines = uwb.invalidLines;
   if (typeof uwb?.lastByteAtMs === 'number') entry.uwbLastByteAtMs = uwb.lastByteAtMs;
   if (typeof uwb?.lastRxHex === 'string') entry.uwbLastRxHex = uwb.lastRxHex;
+  if (typeof uwb?.autoConfig === 'boolean') entry.uwbAutoConfig = uwb.autoConfig;
+  if (typeof uwb?.role === 'number') entry.uwbRole = uwb.role;
+  if (typeof uwb?.pid === 'number') entry.uwbPid = uwb.pid;
+  if (typeof uwb?.period === 'number') entry.uwbPeriod = uwb.period;
+  if (typeof uwb?.localAddress === 'number') entry.uwbLocalAddress = uwb.localAddress;
+  if (typeof uwb?.peer0Address === 'number') entry.uwbPeer0Address = uwb.peer0Address;
   return entry;
 }
 
@@ -83,6 +101,12 @@ export function onlineDevices(): Array<{
   uwbInvalidLines?: number;
   uwbLastByteAtMs?: number;
   uwbLastRxHex?: string;
+  uwbAutoConfig?: boolean;
+  uwbRole?: number;
+  uwbPid?: number;
+  uwbPeriod?: number;
+  uwbLocalAddress?: number;
+  uwbPeer0Address?: number;
 }> {
   const now = Date.now();
   return Array.from(runtime.values())
@@ -102,6 +126,12 @@ export function onlineDevices(): Array<{
       uwbInvalidLines: e.uwbInvalidLines,
       uwbLastByteAtMs: e.uwbLastByteAtMs,
       uwbLastRxHex: e.uwbLastRxHex,
+      uwbAutoConfig: e.uwbAutoConfig,
+      uwbRole: e.uwbRole,
+      uwbPid: e.uwbPid,
+      uwbPeriod: e.uwbPeriod,
+      uwbLocalAddress: e.uwbLocalAddress,
+      uwbPeer0Address: e.uwbPeer0Address,
     }));
 }
 
