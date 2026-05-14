@@ -20,6 +20,7 @@ class _PositioningScreenState extends State<PositioningScreen> {
   PositioningSummaryModel _summary = const PositioningSummaryModel(
     distances: [],
     nodes: [],
+    layout: PositioningLayoutModel(nodes: [], method: 'none'),
     lastUpdated: null,
     ttlMs: 5000,
   );
@@ -328,6 +329,7 @@ class _PositioningScreenState extends State<PositioningScreen> {
                   painter: _PositioningPainter(
                     nodes: nodes.take(3).toList(),
                     distances: _summary.distances,
+                    layout: _summary.layout,
                     labels: {
                       for (final node in nodes.take(3))
                         node.deviceId: _nodeLabel(node.deviceId),
@@ -453,6 +455,7 @@ class _PositioningScreenState extends State<PositioningScreen> {
           final rssi = distance.rssiDbm == null
               ? 'RSSI нет'
               : '${distance.rssiDbm} dBm';
+          final stability = _PositioningPainter.stabilityText(distance);
 
           return Card(
             margin: const EdgeInsets.only(bottom: 8),
@@ -462,7 +465,7 @@ class _PositioningScreenState extends State<PositioningScreen> {
                 '${_deviceName(distance.fromDeviceId)} → ${_deviceName(distance.toDeviceId)}',
               ),
               subtitle: Text(
-                '${distance.source == 'mock' ? 'тестовые данные' : 'данные с устройства'} · $rssi · ${_ageLabel(distance)}',
+                '${distance.source == 'mock' ? 'тестовые данные' : 'данные с устройства'} · $stability · $rssi · ${_ageLabel(distance)}',
               ),
               trailing: Text(
                 '${distance.distanceM.toStringAsFixed(2)} м',
@@ -481,6 +484,7 @@ class _PositioningScreenState extends State<PositioningScreen> {
 class _PositioningPainter extends CustomPainter {
   final List<PositioningNodeModel> nodes;
   final List<DeviceDistanceModel> distances;
+  final PositioningLayoutModel layout;
   final Map<String, String> labels;
   final ColorScheme colorScheme;
   final TextStyle textStyle;
@@ -488,6 +492,7 @@ class _PositioningPainter extends CustomPainter {
   const _PositioningPainter({
     required this.nodes,
     required this.distances,
+    required this.layout,
     required this.labels,
     required this.colorScheme,
     required this.textStyle,
@@ -495,25 +500,25 @@ class _PositioningPainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
-    if (nodes.length == 2) {
+    if (layout.nodes.isEmpty && nodes.length == 2) {
       _paintTwoNodeRuler(canvas, size);
       return;
     }
 
     final positions = _positionsFor(size);
-    final linePaint = Paint()
-      ..color = colorScheme.outline
-      ..strokeWidth = 2;
-
     for (final distance in distances) {
       final from = positions[distance.fromDeviceId];
       final to = positions[distance.toDeviceId];
       if (from == null || to == null) continue;
+      final linePaint = Paint()
+        ..color = _stabilityColor(distance)
+        ..strokeWidth = 3
+        ..strokeCap = StrokeCap.round;
 
       canvas.drawLine(from, to, linePaint);
       _drawText(
         canvas,
-        '${distance.distanceM.toStringAsFixed(2)} м',
+        '${distance.distanceM.toStringAsFixed(2)} м · ${stabilityText(distance)}',
         Offset((from.dx + to.dx) / 2, (from.dy + to.dy) / 2 - 18),
         textStyle.copyWith(
           color: colorScheme.onSurface,
@@ -545,6 +550,16 @@ class _PositioningPainter extends CustomPainter {
   }
 
   Map<String, Offset> _positionsFor(Size size) {
+    if (layout.nodes.isNotEmpty) {
+      return {
+        for (final node in layout.nodes)
+          node.deviceId: Offset(
+            node.x.clamp(0.0, 1.0) * size.width,
+            node.y.clamp(0.0, 1.0) * size.height,
+          ),
+      };
+    }
+
     final center = Offset(size.width / 2, size.height / 2 - 8);
     final radius = math.min(size.width, size.height) * 0.32;
 
@@ -561,6 +576,32 @@ class _PositioningPainter extends CustomPainter {
               math.sin(-math.pi / 2 + i * 2 * math.pi / nodes.length) * radius,
         ),
     };
+  }
+
+  Color _stabilityColor(DeviceDistanceModel distance) {
+    switch (distance.stabilityLabel) {
+      case 'stable':
+        return colorScheme.primary;
+      case 'moving':
+        return colorScheme.tertiary;
+      case 'weak':
+        return colorScheme.error;
+      default:
+        return colorScheme.outline;
+    }
+  }
+
+  static String stabilityText(DeviceDistanceModel distance) {
+    switch (distance.stabilityLabel) {
+      case 'stable':
+        return 'стабильно';
+      case 'moving':
+        return 'движение';
+      case 'weak':
+        return 'слабый сигнал';
+      default:
+        return 'оценка';
+    }
   }
 
   void _paintTwoNodeRuler(Canvas canvas, Size size) {
@@ -680,6 +721,7 @@ class _PositioningPainter extends CustomPainter {
   bool shouldRepaint(covariant _PositioningPainter oldDelegate) {
     return oldDelegate.nodes != nodes ||
         oldDelegate.distances != distances ||
+        oldDelegate.layout != layout ||
         oldDelegate.labels != labels ||
         oldDelegate.colorScheme != colorScheme;
   }
