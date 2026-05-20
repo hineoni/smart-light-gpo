@@ -1066,7 +1066,7 @@ class _PositioningPainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
-    if (layout.nodes.isEmpty && nodes.length == 2) {
+    if (nodes.length == 2) {
       _paintTwoNodeRuler(canvas, size);
       return;
     }
@@ -1185,8 +1185,10 @@ class _PositioningPainter extends CustomPainter {
         ? nodes.last
         : nodes.firstWhere((node) => node.deviceId == distance.toDeviceId);
 
-    final left = Offset(size.width * 0.24, size.height * 0.48);
-    final right = Offset(size.width * 0.76, size.height * 0.48);
+    final span = _twoNodeSpan(size, distance);
+    final center = Offset(size.width / 2, size.height * 0.48);
+    final left = Offset(center.dx - span / 2, center.dy);
+    final right = Offset(center.dx + span / 2, center.dy);
     final linePaint = Paint()
       ..color = colorScheme.primary.withValues(alpha: 0.75)
       ..strokeWidth = 5
@@ -1250,6 +1252,27 @@ class _PositioningPainter extends CustomPainter {
       right + const Offset(0, 42),
       textStyle.copyWith(color: colorScheme.onSurface),
     );
+  }
+
+  double _twoNodeSpan(Size size, DeviceDistanceModel? distance) {
+    final available = math.max(0.0, size.width - 96);
+    if (available <= 0) return size.width * 0.55;
+
+    if (distance == null) {
+      return available * 0.58;
+    }
+
+    const minVisibleMeters = 0.15;
+    const maxVisibleMeters = 3.0;
+    final clampedMeters = distance.distanceM.clamp(
+      minVisibleMeters,
+      maxVisibleMeters,
+    );
+    final normalized =
+        (clampedMeters - minVisibleMeters) /
+        (maxVisibleMeters - minVisibleMeters);
+    final fraction = 0.28 + normalized * 0.72;
+    return available * fraction;
   }
 
   void _drawNode(Canvas canvas, Offset center, PositioningNodeModel node) {
