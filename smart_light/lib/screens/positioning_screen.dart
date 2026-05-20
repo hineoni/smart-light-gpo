@@ -30,7 +30,6 @@ class _PositioningScreenState extends State<PositioningScreen> {
   String? _selectedZoneId;
   bool _isLoading = true;
   bool _isSavingScene = false;
-  DateTime? _lastPolledAt;
 
   @override
   void initState() {
@@ -71,7 +70,6 @@ class _PositioningScreenState extends State<PositioningScreen> {
       _zones = zones;
       _scenes = scenes;
       _selectedZoneId ??= zones.isNotEmpty ? zones.first.id : null;
-      _lastPolledAt = DateTime.now();
       _isLoading = false;
     });
   }
@@ -90,13 +88,6 @@ class _PositioningScreenState extends State<PositioningScreen> {
         ? id.substring(id.length - 4).toUpperCase()
         : id;
     return 'Плата $suffix';
-  }
-
-  String _timeLabel(DateTime? value) {
-    if (value == null) return 'нет данных';
-    return '${value.hour.toString().padLeft(2, '0')}:'
-        '${value.minute.toString().padLeft(2, '0')}:'
-        '${value.second.toString().padLeft(2, '0')}';
   }
 
   String _ageLabel(DeviceDistanceModel distance) {
@@ -797,16 +788,9 @@ class _PositioningScreenState extends State<PositioningScreen> {
           const Icon(Icons.sensors),
           const SizedBox(width: 12),
           Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text('Узлов: ${_summary.nodes.length} · онлайн: $onlineCount'),
-                const SizedBox(height: 4),
-                Text(
-                  'Данные: ${_timeLabel(_summary.lastUpdated)} · опрос: ${_timeLabel(_lastPolledAt)}',
-                  style: theme.textTheme.bodySmall,
-                ),
-              ],
+            child: Text(
+              'Узлов: ${_summary.nodes.length} · онлайн: $onlineCount',
+              style: theme.textTheme.bodyMedium,
             ),
           ),
         ],
