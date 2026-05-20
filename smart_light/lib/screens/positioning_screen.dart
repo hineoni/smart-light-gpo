@@ -588,10 +588,6 @@ class _PositioningScreenState extends State<PositioningScreen> {
                           : Icons.radio_button_unchecked,
                     ),
                     title: Text(zone.name),
-                    subtitle: Text(
-                      'x ${zone.x.toStringAsFixed(2)} · y ${zone.y.toStringAsFixed(2)}'
-                      '${zone.heightM == null ? '' : ' · ${zone.heightM!.toStringAsFixed(1)} м'}',
-                    ),
                     trailing: PopupMenuButton<String>(
                       onSelected: (value) async {
                         Navigator.of(context).pop();
