@@ -1026,9 +1026,7 @@ class _PositioningScreenState extends State<PositioningScreen> {
               title: Text(
                 '${_deviceName(distance.fromDeviceId)} → ${_deviceName(distance.toDeviceId)}',
               ),
-              subtitle: Text(
-                '${distance.source == 'mock' ? 'тестовые данные' : 'данные с устройства'} · $stability · $rssi · ${_ageLabel(distance)}',
-              ),
+              subtitle: Text('$stability · $rssi · ${_ageLabel(distance)}'),
               trailing: Text(
                 '${distance.distanceM.toStringAsFixed(2)} м',
                 style: theme.textTheme.titleMedium?.copyWith(
