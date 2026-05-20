@@ -796,7 +796,7 @@ class _PositioningScreenState extends State<PositioningScreen> {
 
   Widget _buildPositionScheme(BuildContext context) {
     final theme = Theme.of(context);
-    final nodes = _summary.nodes.isNotEmpty
+    final rawNodes = _summary.nodes.isNotEmpty
         ? _summary.nodes
         : _devices
               .map(
@@ -810,6 +810,7 @@ class _PositioningScreenState extends State<PositioningScreen> {
               )
               .take(3)
               .toList();
+    final nodes = _stablePositionNodes(rawNodes).take(3).toList();
 
     return SizedBox(
       height: 260,
@@ -825,11 +826,11 @@ class _PositioningScreenState extends State<PositioningScreen> {
                 padding: const EdgeInsets.all(12),
                 child: CustomPaint(
                   painter: _PositioningPainter(
-                    nodes: nodes.take(3).toList(),
+                    nodes: nodes,
                     distances: _summary.distances,
                     layout: _summary.layout,
                     labels: {
-                      for (final node in nodes.take(3))
+                      for (final node in nodes)
                         node.deviceId: _nodeLabel(node.deviceId),
                     },
                     colorScheme: theme.colorScheme,
@@ -842,6 +843,14 @@ class _PositioningScreenState extends State<PositioningScreen> {
               ),
       ),
     );
+  }
+
+  List<PositioningNodeModel> _stablePositionNodes(
+    List<PositioningNodeModel> nodes,
+  ) {
+    final sorted = List<PositioningNodeModel>.of(nodes);
+    sorted.sort((a, b) => a.deviceId.compareTo(b.deviceId));
+    return sorted;
   }
 
   Future<void> _deleteScene(LightSceneModel scene) async {
@@ -1172,12 +1181,8 @@ class _PositioningPainter extends CustomPainter {
               nodes.any((node) => node.deviceId == item.toDeviceId),
         )
         .firstOrNull;
-    final fromNode = distance == null
-        ? nodes.first
-        : nodes.firstWhere((node) => node.deviceId == distance.fromDeviceId);
-    final toNode = distance == null
-        ? nodes.last
-        : nodes.firstWhere((node) => node.deviceId == distance.toDeviceId);
+    final leftNode = nodes.first;
+    final rightNode = nodes.last;
 
     final span = _twoNodeSpan(size, distance);
     final center = Offset(size.width / 2, size.height * 0.48);
@@ -1232,17 +1237,17 @@ class _PositioningPainter extends CustomPainter {
       );
     }
 
-    _drawNode(canvas, left, fromNode);
-    _drawNode(canvas, right, toNode);
+    _drawNode(canvas, left, leftNode);
+    _drawNode(canvas, right, rightNode);
     _drawText(
       canvas,
-      labels[fromNode.deviceId] ?? fromNode.deviceId,
+      labels[leftNode.deviceId] ?? leftNode.deviceId,
       left + const Offset(0, 42),
       textStyle.copyWith(color: colorScheme.onSurface),
     );
     _drawText(
       canvas,
-      labels[toNode.deviceId] ?? toNode.deviceId,
+      labels[rightNode.deviceId] ?? rightNode.deviceId,
       right + const Offset(0, 42),
       textStyle.copyWith(color: colorScheme.onSurface),
     );
