@@ -132,7 +132,7 @@ class _BleProvisioningScreenState extends State<BleProvisioningScreen> {
               backgroundColor: Colors.green,
             ),
           );
-          Navigator.pop(context);
+          Navigator.pop(context, true);
         } else {
           // Показываем опцию ручной настройки
           _showManualSetupDialog();
@@ -208,7 +208,7 @@ class _BleProvisioningScreenState extends State<BleProvisioningScreen> {
               content: Text('Backend URL configured successfully!'),
             ),
           );
-          Navigator.pop(context);
+          Navigator.pop(context, true);
         } else {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
