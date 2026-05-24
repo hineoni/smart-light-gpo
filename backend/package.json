@@ -14,12 +14,12 @@
     "bcryptjs": "^3.0.3",
     "h3": "1.15.4",
     "jsonwebtoken": "^9.0.3",
-    "nitropack": "^2.12.9",
+    "nitropack": "^2.13.4",
     "prisma": "^6.19.3",
-    "zod": "^4.3.6"
+    "zod": "^4.4.3"
   },
   "devDependencies": {
     "@types/jsonwebtoken": "^9.0.10",
-    "@types/node": "^25.5.2"
+    "@types/node": "^25.9.1"
   }
 }
