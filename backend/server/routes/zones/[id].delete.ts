@@ -1,6 +1,8 @@
+import { requireUserId } from '~/lib/currentUser';
 import { deleteZone } from '~/utils/sceneRuntime';
 
-export default defineEventHandler((event) => {
+export default defineEventHandler(async (event) => {
+  const userId = requireUserId(event);
   const zoneId = decodeURIComponent(getRouterParam(event, 'id') ?? '');
   if (!zoneId) {
     throw createError({
@@ -9,7 +11,7 @@ export default defineEventHandler((event) => {
     });
   }
 
-  if (!deleteZone(zoneId)) {
+  if (!(await deleteZone(userId, zoneId))) {
     throw createError({
       statusCode: 404,
       statusMessage: 'Zone not found',

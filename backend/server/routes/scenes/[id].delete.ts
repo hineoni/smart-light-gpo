@@ -1,6 +1,8 @@
+import { requireUserId } from '~/lib/currentUser';
 import { deleteScene } from '~/utils/sceneRuntime';
 
-export default defineEventHandler((event) => {
+export default defineEventHandler(async (event) => {
+  const userId = requireUserId(event);
   const sceneId = decodeURIComponent(getRouterParam(event, 'id') ?? '');
   if (!sceneId) {
     throw createError({
@@ -9,7 +11,7 @@ export default defineEventHandler((event) => {
     });
   }
 
-  if (!deleteScene(sceneId)) {
+  if (!(await deleteScene(userId, sceneId))) {
     throw createError({
       statusCode: 404,
       statusMessage: 'Scene not found',

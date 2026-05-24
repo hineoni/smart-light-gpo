@@ -1,6 +1,11 @@
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
-import { dirname, join } from 'node:path';
-import { getDevices, getDevice, updateDeviceAngles, updateDeviceLed } from './deviceStorage';
+import { prisma } from '../lib/prisma';
+import {
+  assignDeviceZoneInStorage,
+  getDevices,
+  getUserDevice,
+  updateDeviceAngles,
+  updateDeviceLed,
+} from './deviceStorage';
 import { getPositioningSummary } from './positioningRuntime';
 import { onlineDevices, sendServoCommand, sendToDevice } from './wsRuntime';
 
@@ -29,68 +34,17 @@ export interface SceneDeviceState {
   heightM?: number;
 }
 
-export interface LightScene {
-  id: string;
-  name: string;
-  zoneId?: string;
-  devices: SceneDeviceState[];
-  positioningSnapshot: ReturnType<typeof getPositioningSummary>;
-  createdAt: string;
-  updatedAt: string;
-}
-
-const zones = new Map<string, RoomZone>();
-const scenes = new Map<string, LightScene>();
-const deviceZoneIds = new Map<string, string>();
-const stateFilePath = join(process.cwd(), '.data', 'scene-state.json');
-let stateLoaded = false;
-
-interface PersistedSceneState {
-  zones?: RoomZone[];
-  scenes?: LightScene[];
-  deviceZoneIds?: Array<[string, string]>;
-}
-
-function loadState() {
-  if (stateLoaded) return;
-  stateLoaded = true;
-
-  if (!existsSync(stateFilePath)) return;
-
-  try {
-    const state = JSON.parse(readFileSync(stateFilePath, 'utf8')) as PersistedSceneState;
-    for (const zone of state.zones ?? []) {
-      zones.set(zone.id, zone);
-    }
-    for (const scene of state.scenes ?? []) {
-      scenes.set(scene.id, scene);
-    }
-    for (const [deviceId, zoneId] of state.deviceZoneIds ?? []) {
-      deviceZoneIds.set(deviceId, zoneId);
-    }
-  } catch (error) {
-    console.warn('[sceneRuntime] failed to load scene state:', error);
-  }
-}
-
-function saveState() {
-  try {
-    mkdirSync(dirname(stateFilePath), { recursive: true });
-    writeFileSync(
-      stateFilePath,
-      JSON.stringify({
-        zones: Array.from(zones.values()),
-        scenes: Array.from(scenes.values()),
-        deviceZoneIds: Array.from(deviceZoneIds.entries()),
-      } satisfies PersistedSceneState, null, 2)
-    );
-  } catch (error) {
-    console.warn('[sceneRuntime] failed to save scene state:', error);
-  }
-}
-
 function nowIso() {
   return new Date().toISOString();
+}
+
+function toIso(value: Date | string | null | undefined) {
+  if (!value) return nowIso();
+  return value instanceof Date ? value.toISOString() : value;
+}
+
+function zoneIdFor(userId: string, slug: string) {
+  return `${userId}:${slug}`;
 }
 
 function slugify(input: string) {
@@ -100,24 +54,6 @@ function slugify(input: string) {
     .replace(/[^a-z0-9а-яё]+/giu, '-')
     .replace(/^-+|-+$/g, '');
   return base || `item-${Date.now()}`;
-}
-
-function ensureDefaultZones() {
-  loadState();
-  if (zones.size > 0) return;
-
-  const createdAt = nowIso();
-  const defaults: Array<Omit<RoomZone, 'createdAt' | 'updatedAt'>> = [
-    { id: 'left-wall', name: 'Левая стена', x: 0.12, y: 0.45, heightM: 1.6 },
-    { id: 'center', name: 'Центр', x: 0.5, y: 0.5, heightM: 1.4 },
-    { id: 'table', name: 'Стол', x: 0.55, y: 0.78, heightM: 0.8 },
-    { id: 'shelf', name: 'Полка', x: 0.82, y: 0.34, heightM: 1.8 },
-  ];
-
-  for (const zone of defaults) {
-    zones.set(zone.id, { ...zone, createdAt, updatedAt: createdAt });
-  }
-  saveState();
 }
 
 function clamp01(value: unknown, fallback: number) {
@@ -143,16 +79,217 @@ function normalizeBrightness(value: unknown, fallback = 255) {
   return value <= 1 ? clampByte(value * 255, fallback) : clampByte(value, fallback);
 }
 
-function buildSceneDeviceStates(zoneId?: string): SceneDeviceState[] {
+function toRoomZone(zone: any): RoomZone {
+  return {
+    id: zone.id,
+    name: zone.name,
+    x: zone.x,
+    y: zone.y,
+    heightM: zone.heightM ?? undefined,
+    createdAt: toIso(zone.createdAt),
+    updatedAt: toIso(zone.updatedAt),
+  };
+}
+
+function toScene(scene: any) {
+  return {
+    id: scene.id,
+    name: scene.name,
+    zoneId: scene.zoneId ?? undefined,
+    devices: (scene.devices ?? []).map((device: any) => ({
+      deviceId: device.deviceId,
+      zoneId: device.zoneId ?? undefined,
+      brightness: device.brightness,
+      colorR: device.colorR,
+      colorG: device.colorG,
+      colorB: device.colorB,
+      servo1Angle: device.servo1Angle,
+      servo2Angle: device.servo2Angle,
+      uwbLocalAddress: device.uwbLocalAddress ?? undefined,
+      x: device.x ?? undefined,
+      y: device.y ?? undefined,
+      heightM: device.heightM ?? undefined,
+    })),
+    positioningSnapshot: scene.positioningSnapshot,
+    createdAt: toIso(scene.createdAt),
+    updatedAt: toIso(scene.updatedAt),
+  };
+}
+
+async function ensureDefaultZones(userId: string) {
+  const count = await prisma.zone.count({ where: { userId } });
+  if (count > 0) return;
+
+  const defaults = [
+    { id: zoneIdFor(userId, 'left-wall'), name: 'Левая стена', x: 0.12, y: 0.45, heightM: 1.6 },
+    { id: zoneIdFor(userId, 'center'), name: 'Центр', x: 0.5, y: 0.5, heightM: 1.4 },
+    { id: zoneIdFor(userId, 'table'), name: 'Стол', x: 0.55, y: 0.78, heightM: 0.8 },
+    { id: zoneIdFor(userId, 'shelf'), name: 'Полка', x: 0.82, y: 0.34, heightM: 1.8 },
+  ];
+
+  await prisma.zone.createMany({
+    data: defaults.map(zone => ({ ...zone, userId })),
+    skipDuplicates: true,
+  });
+}
+
+export async function listZones(userId: string) {
+  await ensureDefaultZones(userId);
+  const zones = await prisma.zone.findMany({
+    where: { userId },
+    orderBy: { name: 'asc' },
+  });
+  return zones.map(toRoomZone);
+}
+
+export async function upsertZone(
+  userId: string,
+  input: { id?: string; name: string; x?: number; y?: number; heightM?: number },
+) {
+  await ensureDefaultZones(userId);
+
+  const id = input.id || zoneIdFor(userId, slugify(input.name));
+  const existing = await prisma.zone.findFirst({ where: { id, userId } });
+  const zone = await prisma.zone.upsert({
+    where: { id },
+    update: {
+      name: input.name.trim() || existing?.name || 'Зона',
+      x: clamp01(input.x, existing?.x ?? 0.5),
+      y: clamp01(input.y, existing?.y ?? 0.5),
+      heightM: typeof input.heightM === 'number' && Number.isFinite(input.heightM)
+        ? Math.max(0, input.heightM)
+        : existing?.heightM,
+    },
+    create: {
+      id,
+      userId,
+      name: input.name.trim() || 'Зона',
+      x: clamp01(input.x, 0.5),
+      y: clamp01(input.y, 0.5),
+      heightM: typeof input.heightM === 'number' && Number.isFinite(input.heightM)
+        ? Math.max(0, input.heightM)
+        : undefined,
+    },
+  });
+
+  return toRoomZone(zone);
+}
+
+export async function assignDeviceZone(
+  userId: string,
+  deviceId: string,
+  zoneId: string,
+) {
+  await ensureDefaultZones(userId);
+
+  const [device, zone] = await Promise.all([
+    getUserDevice(userId, deviceId),
+    prisma.zone.findFirst({ where: { id: zoneId, userId } }),
+  ]);
+
+  if (!device) {
+    throw new Error(`Device ${deviceId} not found`);
+  }
+  if (!zone) {
+    throw new Error(`Zone ${zoneId} not found`);
+  }
+
+  await assignDeviceZoneInStorage(userId, deviceId, zoneId);
+  return { deviceId, zoneId };
+}
+
+export async function listScenes(userId: string) {
+  const scenes = await prisma.lightScene.findMany({
+    where: { userId },
+    include: { devices: true },
+    orderBy: { updatedAt: 'desc' },
+  });
+
+  return scenes.map(toScene);
+}
+
+export async function deleteScene(userId: string, sceneId: string) {
+  const scene = await prisma.lightScene.findFirst({
+    where: { id: sceneId, userId },
+  });
+  if (!scene) return false;
+
+  await prisma.lightScene.delete({ where: { id: sceneId } });
+  return true;
+}
+
+export async function updateScene(
+  userId: string,
+  sceneId: string,
+  input: { name?: string; zoneId?: string | null },
+) {
+  await ensureDefaultZones(userId);
+  const scene = await prisma.lightScene.findFirst({
+    where: { id: sceneId, userId },
+    include: { devices: true },
+  });
+  if (!scene) {
+    throw new Error(`Scene ${sceneId} not found`);
+  }
+
+  const nextZoneId = input.zoneId === null ? null : input.zoneId ?? scene.zoneId;
+  const zone = nextZoneId
+    ? await prisma.zone.findFirst({ where: { id: nextZoneId, userId } })
+    : undefined;
+
+  if (nextZoneId && !zone) {
+    throw new Error(`Zone ${nextZoneId} not found`);
+  }
+
+  const updated = await prisma.$transaction(async tx => {
+    await tx.lightScene.update({
+      where: { id: sceneId },
+      data: {
+        name: typeof input.name === 'string' && input.name.trim().length > 0
+          ? input.name.trim()
+          : scene.name,
+        zoneId: nextZoneId,
+      },
+    });
+
+    if (input.zoneId !== undefined) {
+      await tx.lightSceneDeviceState.updateMany({
+        where: { sceneId },
+        data: {
+          zoneId: nextZoneId,
+          x: zone?.x,
+          y: zone?.y,
+          heightM: zone?.heightM,
+        },
+      });
+    }
+
+    return tx.lightScene.findUnique({
+      where: { id: sceneId },
+      include: { devices: true },
+    });
+  });
+
+  return toScene(updated);
+}
+
+async function buildSceneDeviceStates(userId: string, zoneId?: string): Promise<SceneDeviceState[]> {
+  await ensureDefaultZones(userId);
+
+  const [devices, zones] = await Promise.all([
+    getDevices(userId),
+    prisma.zone.findMany({ where: { userId } }),
+  ]);
+  const zoneById = new Map(zones.map(zone => [zone.id, zone]));
   const summary = getPositioningSummary(onlineDevices());
   const positionByDeviceId = new Map(summary.nodes.map((node, index) => [
     node.deviceId,
     { x: summary.nodes.length <= 1 ? 0.5 : index / Math.max(1, summary.nodes.length - 1), y: 0.5 },
   ]));
 
-  return getDevices().map(device => {
-    const assignedZoneId = deviceZoneIds.get(device.id) ?? zoneId;
-    const zone = assignedZoneId ? zones.get(assignedZoneId) : undefined;
+  return devices.map(device => {
+    const assignedZoneId = device.zoneId ?? zoneId;
+    const zone = assignedZoneId ? zoneById.get(assignedZoneId) : undefined;
     const position = positionByDeviceId.get(device.id);
 
     return {
@@ -172,154 +309,89 @@ function buildSceneDeviceStates(zoneId?: string): SceneDeviceState[] {
   });
 }
 
-export function listZones() {
-  ensureDefaultZones();
-  return Array.from(zones.values()).sort((a, b) => a.name.localeCompare(b.name));
-}
+export async function saveScene(
+  userId: string,
+  input: { name: string; zoneId?: string },
+) {
+  await ensureDefaultZones(userId);
 
-export function upsertZone(input: {
-  id?: string;
-  name: string;
-  x?: number;
-  y?: number;
-  heightM?: number;
-}) {
-  ensureDefaultZones();
-
-  const id = input.id || slugify(input.name);
-  const existing = zones.get(id);
-  const timestamp = nowIso();
-  const zone: RoomZone = {
-    id,
-    name: input.name.trim() || existing?.name || 'Зона',
-    x: clamp01(input.x, existing?.x ?? 0.5),
-    y: clamp01(input.y, existing?.y ?? 0.5),
-    heightM: typeof input.heightM === 'number' && Number.isFinite(input.heightM)
-      ? Math.max(0, input.heightM)
-      : existing?.heightM,
-    createdAt: existing?.createdAt ?? timestamp,
-    updatedAt: timestamp,
-  };
-  zones.set(id, zone);
-  saveState();
-  return zone;
-}
-
-export function assignDeviceZone(deviceId: string, zoneId: string) {
-  ensureDefaultZones();
-  if (!getDevice(deviceId)) {
-    throw new Error(`Device ${deviceId} not found`);
-  }
-  if (!zones.has(zoneId)) {
-    throw new Error(`Zone ${zoneId} not found`);
-  }
-  deviceZoneIds.set(deviceId, zoneId);
-  saveState();
-  return { deviceId, zoneId };
-}
-
-export function listScenes() {
-  loadState();
-  return Array.from(scenes.values()).sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
-}
-
-export function deleteScene(sceneId: string) {
-  loadState();
-  const deleted = scenes.delete(sceneId);
-  if (deleted) saveState();
-  return deleted;
-}
-
-export function updateScene(sceneId: string, input: { name?: string; zoneId?: string | null }) {
-  ensureDefaultZones();
-  const scene = scenes.get(sceneId);
-  if (!scene) {
-    throw new Error(`Scene ${sceneId} not found`);
-  }
-
-  const timestamp = nowIso();
-  const nextZoneId = input.zoneId === null ? undefined : input.zoneId ?? scene.zoneId;
-  if (nextZoneId && !zones.has(nextZoneId)) {
-    throw new Error(`Zone ${nextZoneId} not found`);
-  }
-
-  const updated: LightScene = {
-    ...scene,
-    name: typeof input.name === 'string' && input.name.trim().length > 0
-      ? input.name.trim()
-      : scene.name,
-    zoneId: nextZoneId,
-    devices: scene.devices.map(deviceState => {
-      const zone = nextZoneId ? zones.get(nextZoneId) : undefined;
-      return {
-        ...deviceState,
-        zoneId: nextZoneId,
-        x: zone?.x ?? deviceState.x,
-        y: zone?.y ?? deviceState.y,
-        heightM: zone?.heightM ?? deviceState.heightM,
-      };
-    }),
-    updatedAt: timestamp,
-  };
-  scenes.set(sceneId, updated);
-  saveState();
-  return updated;
-}
-
-export function saveScene(input: { name: string; zoneId?: string }) {
-  ensureDefaultZones();
-  const timestamp = nowIso();
-  const id = `scene-${Date.now()}`;
-  const scene: LightScene = {
-    id,
-    name: input.name.trim() || 'Сцена',
-    zoneId: input.zoneId,
-    devices: buildSceneDeviceStates(input.zoneId),
-    positioningSnapshot: getPositioningSummary(onlineDevices()),
-    createdAt: timestamp,
-    updatedAt: timestamp,
-  };
-  scenes.set(id, scene);
-  saveState();
-  return scene;
-}
-
-export function deleteZone(zoneId: string) {
-  ensureDefaultZones();
-  const deleted = zones.delete(zoneId);
-  if (!deleted) return false;
-
-  for (const [deviceId, assignedZoneId] of deviceZoneIds.entries()) {
-    if (assignedZoneId === zoneId) {
-      deviceZoneIds.delete(deviceId);
-    }
-  }
-
-  for (const [sceneId, scene] of scenes.entries()) {
-    if (scene.zoneId !== zoneId && scene.devices.every(device => device.zoneId !== zoneId)) {
-      continue;
-    }
-
-    scenes.set(sceneId, {
-      ...scene,
-      zoneId: scene.zoneId === zoneId ? undefined : scene.zoneId,
-      devices: scene.devices.map(device => device.zoneId === zoneId ? { ...device, zoneId: undefined } : device),
-      updatedAt: nowIso(),
+  if (input.zoneId) {
+    const zone = await prisma.zone.findFirst({
+      where: { id: input.zoneId, userId },
     });
+    if (!zone) {
+      throw new Error(`Zone ${input.zoneId} not found`);
+    }
   }
 
-  saveState();
+  const devices = await buildSceneDeviceStates(userId, input.zoneId);
+  const scene = await prisma.lightScene.create({
+    data: {
+      userId,
+      name: input.name.trim() || 'Сцена',
+      zoneId: input.zoneId,
+      positioningSnapshot: getPositioningSummary(onlineDevices()) as any,
+      devices: {
+        create: devices.map(device => ({
+          deviceId: device.deviceId,
+          zoneId: device.zoneId,
+          brightness: device.brightness,
+          colorR: device.colorR,
+          colorG: device.colorG,
+          colorB: device.colorB,
+          servo1Angle: device.servo1Angle,
+          servo2Angle: device.servo2Angle,
+          uwbLocalAddress: device.uwbLocalAddress,
+          x: device.x,
+          y: device.y,
+          heightM: device.heightM,
+        })),
+      },
+    },
+    include: { devices: true },
+  });
+
+  return toScene(scene);
+}
+
+export async function deleteZone(userId: string, zoneId: string) {
+  await ensureDefaultZones(userId);
+  const zone = await prisma.zone.findFirst({ where: { id: zoneId, userId } });
+  if (!zone) return false;
+
+  await prisma.$transaction([
+    prisma.device.updateMany({
+      where: { userId, zoneId },
+      data: { zoneId: null },
+    }),
+    prisma.lightScene.updateMany({
+      where: { userId, zoneId },
+      data: { zoneId: null },
+    }),
+    prisma.lightSceneDeviceState.updateMany({
+      where: {
+        zoneId,
+        scene: { userId },
+      },
+      data: { zoneId: null },
+    }),
+    prisma.zone.delete({ where: { id: zoneId } }),
+  ]);
+
   return true;
 }
 
-export function applyScene(sceneId: string) {
-  loadState();
-  const scene = scenes.get(sceneId);
+export async function applyScene(userId: string, sceneId: string) {
+  const scene = await prisma.lightScene.findFirst({
+    where: { id: sceneId, userId },
+    include: { devices: true },
+  });
   if (!scene) {
     throw new Error(`Scene ${sceneId} not found`);
   }
 
-  const results = scene.devices.map(deviceState => {
+  const results = [];
+  for (const deviceState of scene.devices) {
     const brightness = normalizeBrightness(deviceState.brightness);
     const ledColorSent = sendToDevice(deviceState.deviceId, {
       type: 'set_led_color',
@@ -334,33 +406,32 @@ export function applyScene(sceneId: string) {
     const servo1Sent = sendServoCommand(deviceState.deviceId, 1, deviceState.servo1Angle);
     const servo2Sent = sendServoCommand(deviceState.deviceId, 2, deviceState.servo2Angle);
 
-    updateDeviceLed(
+    await updateDeviceLed(
       deviceState.deviceId,
       brightness,
       deviceState.colorR,
       deviceState.colorG,
-      deviceState.colorB
+      deviceState.colorB,
     );
-    updateDeviceAngles(deviceState.deviceId, deviceState.servo1Angle, deviceState.servo2Angle);
+    await updateDeviceAngles(deviceState.deviceId, deviceState.servo1Angle, deviceState.servo2Angle);
     if (deviceState.zoneId) {
-      deviceZoneIds.set(deviceState.deviceId, deviceState.zoneId);
+      await assignDeviceZoneInStorage(userId, deviceState.deviceId, deviceState.zoneId);
     }
 
-    return {
+    results.push({
       deviceId: deviceState.deviceId,
       ledColorSent,
       ledBrightnessSent,
       servo1Sent,
       servo2Sent,
-    };
-  });
+    });
+  }
 
-  saveState();
   return { sceneId, results };
 }
 
-function fallbackPose(deviceId: string) {
-  const devices = getDevices();
+async function fallbackPose(userId: string, deviceId: string) {
+  const devices = await getDevices(userId);
   const index = Math.max(0, devices.findIndex(device => device.id === deviceId));
   const count = Math.max(1, devices.length);
   return {
@@ -370,14 +441,17 @@ function fallbackPose(deviceId: string) {
   };
 }
 
-function devicePose(deviceId: string) {
-  const assignedZoneId = deviceZoneIds.get(deviceId);
-  const zone = assignedZoneId ? zones.get(assignedZoneId) : undefined;
+async function devicePose(userId: string, deviceId: string) {
+  const device = await getUserDevice(userId, deviceId);
+  const zone = device?.zoneId
+    ? await prisma.zone.findFirst({ where: { id: device.zoneId, userId } })
+    : undefined;
+  const fallback = await fallbackPose(userId, deviceId);
   return {
-    zoneId: assignedZoneId,
-    x: zone?.x ?? fallbackPose(deviceId).x,
-    y: zone?.y ?? fallbackPose(deviceId).y,
-    heightM: zone?.heightM ?? fallbackPose(deviceId).heightM,
+    zoneId: device?.zoneId,
+    x: zone?.x ?? fallback.x,
+    y: zone?.y ?? fallback.y,
+    heightM: zone?.heightM ?? fallback.heightM,
   };
 }
 
@@ -385,9 +459,15 @@ function clampServo(value: number) {
   return Math.min(180, Math.max(0, Math.round(value)));
 }
 
-export function aimDeviceAtTarget(sourceDeviceId: string, targetDeviceId: string) {
-  const source = getDevice(sourceDeviceId);
-  const target = getDevice(targetDeviceId);
+export async function aimDeviceAtTarget(
+  userId: string,
+  sourceDeviceId: string,
+  targetDeviceId: string,
+) {
+  const [source, target] = await Promise.all([
+    getUserDevice(userId, sourceDeviceId),
+    getUserDevice(userId, targetDeviceId),
+  ]);
   if (!source) {
     throw new Error(`Source device ${sourceDeviceId} not found`);
   }
@@ -395,9 +475,8 @@ export function aimDeviceAtTarget(sourceDeviceId: string, targetDeviceId: string
     throw new Error(`Target device ${targetDeviceId} not found`);
   }
 
-  ensureDefaultZones();
-  const sourcePose = devicePose(sourceDeviceId);
-  const targetPose = devicePose(targetDeviceId);
+  const sourcePose = await devicePose(userId, sourceDeviceId);
+  const targetPose = await devicePose(userId, targetDeviceId);
   const dx = targetPose.x - sourcePose.x;
   const dy = targetPose.y - sourcePose.y;
   const dz = targetPose.heightM - sourcePose.heightM;
@@ -409,7 +488,7 @@ export function aimDeviceAtTarget(sourceDeviceId: string, targetDeviceId: string
 
   const servo1Sent = sendServoCommand(sourceDeviceId, 1, servo1Angle);
   const servo2Sent = sendServoCommand(sourceDeviceId, 2, servo2Angle);
-  updateDeviceAngles(sourceDeviceId, servo1Angle, servo2Angle);
+  await updateDeviceAngles(sourceDeviceId, servo1Angle, servo2Angle);
 
   return {
     sourceDeviceId,

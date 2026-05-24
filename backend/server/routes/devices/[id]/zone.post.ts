@@ -1,6 +1,8 @@
+import { requireUserId } from '~/lib/currentUser';
 import { assignDeviceZone } from '~/utils/sceneRuntime';
 
 export default defineEventHandler(async (event) => {
+  const userId = requireUserId(event);
   const deviceId = getRouterParam(event, 'id');
   const body = await readBody<{ zoneId?: string }>(event);
 
@@ -12,7 +14,7 @@ export default defineEventHandler(async (event) => {
   }
 
   try {
-    return assignDeviceZone(deviceId, body.zoneId);
+    return await assignDeviceZone(userId, deviceId, body.zoneId);
   } catch (error) {
     throw createError({
       statusCode: 404,
@@ -20,4 +22,3 @@ export default defineEventHandler(async (event) => {
     });
   }
 });
-

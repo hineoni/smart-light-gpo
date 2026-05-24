@@ -1,9 +1,12 @@
+import { requireUserId } from '~/lib/currentUser';
 import { onlineDevices } from '~/utils/wsRuntime';
-import { getDevice } from '~/utils/deviceStorage';
+import { getDevices } from '~/utils/deviceStorage';
 
-export default defineEventHandler(() => {
-  const list = onlineDevices().map(d => {
-    const dev = getDevice(d.deviceId);
+export default defineEventHandler(async (event) => {
+  const devices = await getDevices(requireUserId(event));
+  const devicesById = new Map(devices.map(device => [device.id, device]));
+  const list = onlineDevices().filter(d => devicesById.has(d.deviceId)).map(d => {
+    const dev = devicesById.get(d.deviceId);
     return {
       deviceId: d.deviceId,
       name: dev?.name,
