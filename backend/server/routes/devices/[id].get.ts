@@ -1,8 +1,10 @@
-import { getDevice } from '~/utils/deviceStorage';
+import { requireUserId } from '~/lib/currentUser';
+import { getUserDevice } from '~/utils/deviceStorage';
 
-export default defineEventHandler((event) => {
+export default defineEventHandler(async (event) => {
+  const userId = requireUserId(event);
   const id = getRouterParam(event, 'id');
-  const device = getDevice(id!);
+  const device = await getUserDevice(userId, id!);
 
   if (!device) {
     throw createError({

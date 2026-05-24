@@ -1,6 +1,8 @@
+import { requireUserId } from '~/lib/currentUser';
 import { updateScene } from '~/utils/sceneRuntime';
 
 export default defineEventHandler(async (event) => {
+  const userId = requireUserId(event);
   const sceneId = decodeURIComponent(getRouterParam(event, 'id') ?? '');
   if (!sceneId) {
     throw createError({
@@ -12,7 +14,7 @@ export default defineEventHandler(async (event) => {
   const body = await readBody<{ name?: string; zoneId?: string | null }>(event);
 
   try {
-    return updateScene(sceneId, {
+    return await updateScene(userId, sceneId, {
       name: body.name,
       zoneId: body.zoneId,
     });

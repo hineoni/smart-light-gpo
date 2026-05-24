@@ -55,7 +55,7 @@ export default defineWebSocketHandler({
   open(peer: any) {
     console.log('[ws] open', peer.id);
   },
-  message(peer: any, message: any) {
+  async message(peer: any, message: any) {
     let payload: IncomingMessage;
     try {
       payload = JSON.parse(message.text());
@@ -71,16 +71,16 @@ export default defineWebSocketHandler({
       const { deviceId } = payload as RegisterMsg;
       
       // Пытаемся получить устройство или автоматически регистрируем
-      let dev = getDevice(deviceId);
+      let dev = await getDevice(deviceId);
       if (!dev) {
         console.log(`[ws] auto-registering new device: ${deviceId}`);
         // Получаем IP адрес из peer (если доступен)
         const clientIP = peer.request?.socket?.remoteAddress || 'unknown';
-        dev = autoRegisterDevice(deviceId, clientIP);
+        dev = await autoRegisterDevice(deviceId, clientIP);
       }
       
       registerPeer(deviceId, peer);
-      updateDeviceStatus(deviceId, 'connected');
+      await updateDeviceStatus(deviceId, 'connected');
       peer.send(JSON.stringify({ type: 'ack', action: 'register', deviceId }));
       console.log(`[ws] device ${deviceId} registered successfully`);
       return;
@@ -89,16 +89,16 @@ export default defineWebSocketHandler({
     if (payload.type === 'heartbeat') {
       let rt = updateHeartbeat(peer.id, payload.servo1?.angle, payload.servo2?.angle, payload.uwb);
       if (!rt?.deviceId && typeof payload.deviceId === 'string' && payload.deviceId.length > 0) {
-        if (!getDevice(payload.deviceId)) {
+        if (!(await getDevice(payload.deviceId))) {
           const clientIP = peer.request?.socket?.remoteAddress || 'unknown';
-          autoRegisterDevice(payload.deviceId, clientIP);
+          await autoRegisterDevice(payload.deviceId, clientIP);
         }
         registerPeer(payload.deviceId, peer);
         rt = updateHeartbeat(peer.id, payload.servo1?.angle, payload.servo2?.angle, payload.uwb);
       }
       if (rt?.deviceId) {
-        updateDeviceStatus(rt.deviceId, 'connected');
-        updateDeviceUwbStatus(rt.deviceId, payload.uwb?.ready, payload.uwb?.rangeCount, payload.uwb);
+        await updateDeviceStatus(rt.deviceId, 'connected');
+        await updateDeviceUwbStatus(rt.deviceId, payload.uwb?.ready, payload.uwb?.rangeCount, payload.uwb);
         updateDeviceRanges(rt.deviceId, payload.uwb?.ranges);
       }
       peer.send(JSON.stringify({ type: 'ack', action: 'heartbeat' }));

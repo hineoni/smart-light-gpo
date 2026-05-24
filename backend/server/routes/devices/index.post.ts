@@ -1,25 +1,26 @@
 import { requireUserId } from '~/lib/currentUser';
-import { saveScene } from '~/utils/sceneRuntime';
+import { addDevice } from '~/utils/deviceStorage';
 
 export default defineEventHandler(async (event) => {
   const userId = requireUserId(event);
-  const body = await readBody<{ name?: string; zoneId?: string }>(event);
+  const body = await readBody<{
+    id?: string;
+    name?: string;
+    ip?: string;
+  }>(event);
 
   if (!body.name || typeof body.name !== 'string') {
     throw createError({
       statusCode: 400,
-      statusMessage: 'Scene name is required',
+      statusMessage: 'Device name is required',
     });
   }
 
   try {
-    return await saveScene(userId, {
-      name: body.name,
-      zoneId: body.zoneId,
-    });
+    return await addDevice(userId, body.name, body.ip ?? 'unknown', body.id);
   } catch (error) {
     throw createError({
-      statusCode: 404,
+      statusCode: 409,
       statusMessage: (error as Error).message,
     });
   }

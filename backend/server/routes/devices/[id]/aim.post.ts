@@ -1,6 +1,8 @@
+import { requireUserId } from '~/lib/currentUser';
 import { aimDeviceAtTarget } from '~/utils/sceneRuntime';
 
 export default defineEventHandler(async (event) => {
+  const userId = requireUserId(event);
   const sourceDeviceId = getRouterParam(event, 'id');
   const body = await readBody<{ targetDeviceId?: string }>(event);
 
@@ -12,7 +14,7 @@ export default defineEventHandler(async (event) => {
   }
 
   try {
-    return aimDeviceAtTarget(sourceDeviceId, body.targetDeviceId);
+    return await aimDeviceAtTarget(userId, sourceDeviceId, body.targetDeviceId);
   } catch (error) {
     throw createError({
       statusCode: 404,
@@ -20,4 +22,3 @@ export default defineEventHandler(async (event) => {
     });
   }
 });
-

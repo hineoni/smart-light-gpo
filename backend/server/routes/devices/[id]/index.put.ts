@@ -1,8 +1,10 @@
-import { getDevice } from '~/utils/deviceStorage';
+import { requireUserId } from '~/lib/currentUser';
+import { getUserDevice, renameDevice } from '~/utils/deviceStorage';
 
 export default defineEventHandler(async (event) => {
+  const userId = requireUserId(event);
   const id = getRouterParam(event, 'id');
-  const device = getDevice(id!);
+  const device = await getUserDevice(userId, id!);
 
   if (!device) {
     throw createError({
@@ -14,7 +16,7 @@ export default defineEventHandler(async (event) => {
   const body = await readBody(event);
 
   if (body.name && typeof body.name === 'string') {
-    device.name = body.name;
+    return { success: true, device: await renameDevice(userId, id!, body.name) };
   }
 
   return { success: true, device };

@@ -1,6 +1,8 @@
+import { requireUserId } from '~/lib/currentUser';
 import { upsertZone } from '~/utils/sceneRuntime';
 
 export default defineEventHandler(async (event) => {
+  const userId = requireUserId(event);
   const body = await readBody<{
     id?: string;
     name?: string;
@@ -16,7 +18,7 @@ export default defineEventHandler(async (event) => {
     });
   }
 
-  return upsertZone({
+  return upsertZone(userId, {
     id: body.id,
     name: body.name,
     x: body.x,
@@ -24,4 +26,3 @@ export default defineEventHandler(async (event) => {
     heightM: body.heightM,
   });
 });
-

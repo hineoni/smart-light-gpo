@@ -1,6 +1,8 @@
+import { requireUserId } from '~/lib/currentUser';
 import { applyScene } from '~/utils/sceneRuntime';
 
-export default defineEventHandler((event) => {
+export default defineEventHandler(async (event) => {
+  const userId = requireUserId(event);
   const sceneId = decodeURIComponent(getRouterParam(event, 'id') ?? '');
   if (!sceneId) {
     throw createError({
@@ -10,7 +12,7 @@ export default defineEventHandler((event) => {
   }
 
   try {
-    return applyScene(sceneId);
+    return await applyScene(userId, sceneId);
   } catch (error) {
     throw createError({
       statusCode: 404,
