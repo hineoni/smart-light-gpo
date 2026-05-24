@@ -44,6 +44,12 @@ class DeviceService {
           return DeviceModel.fromJson(json);
         }).toList();
         print('[DEVICE_SERVICE] Returning ${devices.length} devices');
+        if (devices.isEmpty) {
+          final claimedDevices = await claimOnlineDevices();
+          if (claimedDevices.isNotEmpty) {
+            return claimedDevices;
+          }
+        }
         return devices;
       } else {
         // Если /devices не работает, пробуем /devices/online
