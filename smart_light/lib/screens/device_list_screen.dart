@@ -77,10 +77,13 @@ class _DeviceListScreenState extends State<DeviceListScreen> {
       floatingActionButton: FloatingActionButton(
         child: const Icon(Icons.add),
         onPressed: () async {
-          await Navigator.push(
+          final provisioned = await Navigator.push<bool>(
             context,
             MaterialPageRoute(builder: (_) => const BleProvisioningScreen()),
           );
+          if (provisioned == true) {
+            await DeviceService.claimOnlineDevices();
+          }
           setState(() {
             _loadDevices();
           });

@@ -172,6 +172,32 @@ export async function addDevice(
   return mergeRuntime(toDeviceConfig(device));
 }
 
+export async function claimOnlineDevices(
+  userId: string,
+  onlineDeviceIds: string[],
+): Promise<DeviceConfig[]> {
+  const uniqueIds = Array.from(new Set(onlineDeviceIds.filter(Boolean)));
+  if (uniqueIds.length === 0) return [];
+
+  await prisma.device.updateMany({
+    where: {
+      id: { in: uniqueIds },
+      userId: null,
+    },
+    data: { userId },
+  });
+
+  const devices = await prisma.device.findMany({
+    where: {
+      id: { in: uniqueIds },
+      userId,
+    },
+    orderBy: { createdAt: 'asc' },
+  });
+
+  return devices.map(device => mergeRuntime(toDeviceConfig(device)));
+}
+
 export async function deleteDevice(userId: string, id: string): Promise<boolean> {
   const device = await prisma.device.findFirst({ where: { id, userId } });
   if (!device) return false;

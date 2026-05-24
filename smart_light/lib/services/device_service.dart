@@ -86,6 +86,34 @@ class DeviceService {
     }
   }
 
+  static Future<List<DeviceModel>> claimOnlineDevices({
+    String? deviceId,
+  }) async {
+    for (var attempt = 0; attempt < 6; attempt++) {
+      try {
+        final response = await _post(
+          '/devices/claim-online',
+          body: json.encode({if (deviceId != null) 'deviceId': deviceId}),
+        ).timeout(const Duration(seconds: 5));
+
+        if (response.statusCode == 200) {
+          final List<Map<String, dynamic>> data =
+              (json.decode(response.body) as List).cast<Map<String, dynamic>>();
+          final devices = data.map(DeviceModel.fromJson).toList();
+          if (devices.isNotEmpty || deviceId != null) {
+            return devices;
+          }
+        }
+      } catch (e) {
+        print('[DEVICE_SERVICE] Error claiming online devices: $e');
+      }
+
+      await Future.delayed(const Duration(seconds: 1));
+    }
+
+    return [];
+  }
+
   static Future<void> removeDevice(String id) async {
     try {
       final response = await _delete('/devices/$id');
