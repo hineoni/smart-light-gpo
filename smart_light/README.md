@@ -1,16 +1,41 @@
-# smart_light
+# Smart Light Mobile
 
-A new Flutter project.
+Flutter-приложение для управления устройствами Smart Light.
 
-## Getting Started
+## Возможности
 
-This project is a starting point for a Flutter application.
+- регистрация, вход и восстановление пользовательской сессии;
+- добавление и привязка доступных устройств;
+- управление цветом и яркостью LED;
+- управление положением сервоприводов;
+- создание зон и световых сцен;
+- просмотр расстояний и схемы UWB-позиционирования;
+- BLE-подготовка нового ESP32-устройства.
 
-A few resources to get you started if this is your first Flutter project:
+## Настройка backend
 
-- [Lab: Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Cookbook: Useful Flutter samples](https://docs.flutter.dev/cookbook)
+Перед запуском замените тестовый адрес `http://172.20.10.13:3000` на адрес
+доступного backend в следующих файлах:
 
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+- `lib/services/auth_service.dart`;
+- `lib/services/device_service.dart`;
+- `lib/screens/api_test_screen.dart`.
+
+Физическое устройство и телефон должны иметь сетевой доступ к backend.
+
+## Запуск
+
+```bash
+flutter pub get
+flutter run
+```
+
+Проверка проекта:
+
+```bash
+flutter analyze
+flutter test
+```
+
+Для BLE и сетевых запросов приложению требуются соответствующие разрешения
+Android и iOS. Их конфигурация находится в платформенных каталогах проекта.
