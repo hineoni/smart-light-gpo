@@ -5,7 +5,13 @@ UWB-позиционированием, backend на Nitro и мобильным
 Система позволяет управлять светодиодами и сервоприводами, объединять устройства
 в зоны, сохранять световые сцены и отслеживать взаимное расположение устройств.
 
-<img width="347" height="212" alt="изображение" src="https://github.com/user-attachments/assets/345112e7-3a5d-4a11-b7d7-0118de696624" />
+<p align="center">
+  <img
+    src="docs/images/use-case-diagram.png"
+    width="560"
+    alt="Диаграмма вариантов использования системы Smart Light"
+  />
+</p>
 
 ## Возможности
 
@@ -105,10 +111,21 @@ flutter run
 
 ## Интерфейс приложения
 
-<img width="259" height="351" alt="изображение" src="https://github.com/user-attachments/assets/5d21403a-a8c3-4eb5-b599-d5a691439bd1" />
-<img width="290" height="193" alt="изображение" src="https://github.com/user-attachments/assets/3a10c73d-6bf5-46cb-9fae-d707d95944f9" />
-<img width="208" height="303" alt="изображение" src="https://github.com/user-attachments/assets/8c53e72f-a0d4-4d41-a437-63101aa459da" />
-<img width="194" height="313" alt="изображение" src="https://github.com/user-attachments/assets/5a8332cb-970d-4767-aba1-be46f6642e7d" />
+| Регистрация | Авторизация |
+|:-----------:|:-----------:|
+| <img src="docs/images/interface-registration.png" width="300" alt="Экран регистрации" /> | <img src="docs/images/interface-login.png" width="300" alt="Экран авторизации" /> |
+
+| Список устройств | Управление устройством |
+|:----------------:|:----------------------:|
+| <img src="docs/images/interface-devices.png" width="300" alt="Список устройств пользователя" /> | <img src="docs/images/interface-device-control.png" width="300" alt="Управление сервоприводами и освещением" /> |
+
+| Подключение через BLE | UWB-позиционирование |
+|:---------------------:|:--------------------:|
+| <img src="docs/images/interface-ble-provisioning.png" width="300" alt="Поиск устройств через BLE" /> | <img src="docs/images/interface-positioning.png" width="300" alt="Экран расположения устройств и световых сцен" /> |
+
+| Создание световой сцены |
+|:-----------------------:|
+| <img src="docs/images/interface-new-scene.png" width="300" alt="Создание новой световой сцены" /> |
 
 ## Рабочее устройство
 
