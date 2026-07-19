@@ -1,0 +1,121 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id            String         @id @default(cuid())
+  email         String         @unique
+  passwordHash  String
+  name          String?
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+  devices       Device[]
+  zones         Zone[]
+  scenes        LightScene[]
+  refreshTokens RefreshToken[]
+}
+
+model RefreshToken {
+  id        String    @id @default(cuid())
+  token     String    @unique
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expiresAt DateTime
+  createdAt DateTime  @default(now())
+  revokedAt DateTime?
+}
+
+model Device {
+  id                String   @id
+  name              String
+  ip                String   @default("unknown")
+  status            String   @default("disconnected")
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  servo1Angle       Float?
+  servo2Angle       Float?
+  brightness        Float?
+  colorR            Int?
+  colorG            Int?
+  colorB            Int?
+  lastHeartbeat     DateTime?
+  uwbReady          Boolean?
+  uwbRangeCount     Int?
+  uwbUartBytes      Int?
+  uwbDiscardedBytes Int?
+  uwbParsedFrames   Int?
+  uwbInvalidFrames  Int?
+  uwbParsedLines    Int?
+  uwbInvalidLines   Int?
+  uwbLastByteAtMs   Int?
+  uwbLastRxHex      String?
+  uwbAutoConfig     Boolean?
+  uwbRole           Int?
+  uwbPid            Int?
+  uwbPeriod         Int?
+  uwbLocalAddress   Int?     @unique
+  uwbPeer0Address   Int?
+  userId            String?
+  user              User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  zoneId            String?
+  zone              Zone?    @relation(fields: [zoneId], references: [id], onDelete: SetNull)
+
+  sceneStates LightSceneDeviceState[]
+}
+
+model Zone {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name      String
+  x         Float    @default(0.5)
+  y         Float    @default(0.5)
+  heightM   Float?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  devices Device[]
+  scenes  LightScene[]
+
+  @@unique([userId, id])
+}
+
+model LightScene {
+  id                  String                   @id @default(cuid())
+  userId              String
+  user                User                     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name                String
+  zoneId              String?
+  zone                Zone?                    @relation(fields: [zoneId], references: [id], onDelete: SetNull)
+  positioningSnapshot Json?
+  createdAt           DateTime                 @default(now())
+  updatedAt           DateTime                 @updatedAt
+  devices             LightSceneDeviceState[]
+}
+
+model LightSceneDeviceState {
+  id              String     @id @default(cuid())
+  sceneId         String
+  scene           LightScene @relation(fields: [sceneId], references: [id], onDelete: Cascade)
+  deviceId        String
+  device          Device     @relation(fields: [deviceId], references: [id], onDelete: Cascade)
+  zoneId          String?
+  brightness      Float      @default(255)
+  colorR          Int        @default(255)
+  colorG          Int        @default(255)
+  colorB          Int        @default(255)
+  servo1Angle     Float      @default(90)
+  servo2Angle     Float      @default(90)
+  uwbLocalAddress Int?
+  x               Float?
+  y               Float?
+  heightM         Float?
+
+  @@index([sceneId])
+  @@index([deviceId])
+}

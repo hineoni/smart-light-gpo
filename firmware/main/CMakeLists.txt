@@ -8,12 +8,15 @@ idf_component_register(
         wifi_manager
         servo_controller
         led_controller
+        uwb_positioning
         web_server
         websocket_client
         esp_wifi
         esp_http_server
         nvs_flash
         driver
-        json
+        esp_driver_gpio
+        esp_driver_uart
+        cjson
         spiffs
 )

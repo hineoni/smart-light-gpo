@@ -2,6 +2,7 @@
 backend/node_modules/
 backend/.nitro/
 backend/.output/
+backend/.data/
 backend/dist/
 backend/npm-debug.log
 
@@ -17,4 +18,5 @@ frontend/pubspec.lock
 *.log
 soft
 build
-
+firmware/build-idf6/
+firmware/managed_components/

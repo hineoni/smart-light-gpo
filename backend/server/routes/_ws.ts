@@ -1,17 +1,61 @@
-import { getDevice, updateDeviceStatus, autoRegisterDevice } from '~/utils/deviceStorage';
+import { getDevice, updateDeviceStatus, autoRegisterDevice, updateDeviceUwbStatus } from '~/utils/deviceStorage';
 import { registerPeer, unregisterPeer, updateHeartbeat } from '~/utils/wsRuntime';
+import { updateDeviceRanges } from '~/utils/positioningRuntime';
 
 interface IncomingBase { type: string; }
 interface RegisterMsg extends IncomingBase { type: 'register'; deviceId: string; }
-interface HeartbeatMsg extends IncomingBase { type: 'heartbeat'; servo1?: { angle: number }; servo2?: { angle: number }; }
+interface HeartbeatMsg extends IncomingBase {
+  type: 'heartbeat';
+  deviceId?: string;
+  servo1?: { angle: number };
+  servo2?: { angle: number };
+  uwb?: {
+    ready?: boolean;
+    rangeCount?: number;
+    uartBytes?: number;
+    discardedBytes?: number;
+    parsedFrames?: number;
+    invalidFrames?: number;
+    parsedLines?: number;
+    invalidLines?: number;
+    lastByteAtMs?: number;
+    lastRxHex?: string;
+    autoConfig?: boolean;
+    role?: number;
+    pid?: number;
+    period?: number;
+    localAddress?: number;
+    peer0Address?: number;
+    ranges?: Array<{ peerId: string; distanceM: number; updatedAtMs?: number; rssiDbm?: number }>;
+  };
+}
 
 type IncomingMessage = RegisterMsg | HeartbeatMsg | any;
+const heartbeatLogAtByPeer = new Map<string, number>();
+
+function logIncoming(peerId: string, payload: IncomingMessage) {
+  if (payload.type !== 'heartbeat') {
+    console.log(`[ws] incoming from ${peerId}:`, payload.type, payload);
+    return;
+  }
+
+  const now = Date.now();
+  const lastLogAt = heartbeatLogAtByPeer.get(peerId) ?? 0;
+  if (now - lastLogAt < 5000) return;
+
+  heartbeatLogAtByPeer.set(peerId, now);
+  console.log(`[ws] heartbeat from ${peerId}:`, {
+    servo1: payload.servo1,
+    servo2: payload.servo2,
+    uwb: payload.uwb,
+  });
+}
 
 export default defineWebSocketHandler({
   open(peer: any) {
     console.log('[ws] open', peer.id);
   },
-  message(peer: any, message: any) {
+  async message(peer: any, message: any) {
     let payload: IncomingMessage;
     try {
       payload = JSON.parse(message.text());
@@ -21,30 +65,42 @@ export default defineWebSocketHandler({
       return;
     }
 
-    console.log(`[ws] incoming from ${peer.id}:`, payload.type, payload);
+    logIncoming(peer.id, payload);
 
     if (payload.type === 'register') {
       const { deviceId } = payload as RegisterMsg;
       
       // Пытаемся получить устройство или автоматически регистрируем
-      let dev = getDevice(deviceId);
+      let dev = await getDevice(deviceId);
       if (!dev) {
         console.log(`[ws] auto-registering new device: ${deviceId}`);
         // Получаем IP адрес из peer (если доступен)
         const clientIP = peer.request?.socket?.remoteAddress || 'unknown';
-        dev = autoRegisterDevice(deviceId, clientIP);
+        dev = await autoRegisterDevice(deviceId, clientIP);
       }
       
       registerPeer(deviceId, peer);
-      updateDeviceStatus(deviceId, 'connected');
+      await updateDeviceStatus(deviceId, 'connected');
       peer.send(JSON.stringify({ type: 'ack', action: 'register', deviceId }));
       console.log(`[ws] device ${deviceId} registered successfully`);
       return;
     }
 
     if (payload.type === 'heartbeat') {
-      const rt = updateHeartbeat(peer.id, payload.servo1?.angle, payload.servo2?.angle);
-      if (rt?.deviceId) updateDeviceStatus(rt.deviceId, 'connected');
+      let rt = updateHeartbeat(peer.id, payload.servo1?.angle, payload.servo2?.angle, payload.uwb);
+      if (!rt?.deviceId && typeof payload.deviceId === 'string' && payload.deviceId.length > 0) {
+        if (!(await getDevice(payload.deviceId))) {
+          const clientIP = peer.request?.socket?.remoteAddress || 'unknown';
+          await autoRegisterDevice(payload.deviceId, clientIP);
+        }
+        registerPeer(payload.deviceId, peer);
+        rt = updateHeartbeat(peer.id, payload.servo1?.angle, payload.servo2?.angle, payload.uwb);
+      }
+      if (rt?.deviceId) {
+        await updateDeviceStatus(rt.deviceId, 'connected');
+        await updateDeviceUwbStatus(rt.deviceId, payload.uwb?.ready, payload.uwb?.rangeCount, payload.uwb);
+        updateDeviceRanges(rt.deviceId, payload.uwb?.ranges);
+      }
       peer.send(JSON.stringify({ type: 'ack', action: 'heartbeat' }));
       return;
     }
@@ -54,6 +110,7 @@ export default defineWebSocketHandler({
   },
   close(peer: any) {
     console.log('[ws] close', peer.id);
+    heartbeatLogAtByPeer.delete(peer.id);
     unregisterPeer(peer.id);
   },
   error(peer: any, error: any) {

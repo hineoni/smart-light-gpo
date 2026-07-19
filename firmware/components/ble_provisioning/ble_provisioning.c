@@ -2,20 +2,34 @@
 #include "esp_log.h"
 #include "esp_wifi.h"
 #include "esp_event.h"
-#include "wifi_provisioning/manager.h"
-#include "wifi_provisioning/scheme_ble.h"
-#include "esp_bt.h"
-#include "nimble/nimble_port.h"
-#include "nimble/nimble_port_freertos.h"
-#include "host/ble_hs.h"
-#include "host/ble_uuid.h"
-#include "host/ble_gap.h"
+#include "network_provisioning/manager.h"
+#include "network_provisioning/scheme_ble.h"
 #include "esp_timer.h"
 #include "config_storage.h"
 #include "nvs_flash.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include <string.h>
+
+// ESP-IDF 6 moved wifi_provisioning into the external network_provisioning component.
+// Keep the existing module logic by aliasing the renamed APIs and event constants.
+#define WIFI_PROV_EVENT NETWORK_PROV_EVENT
+#define WIFI_PROV_START NETWORK_PROV_START
+#define WIFI_PROV_CRED_RECV NETWORK_PROV_WIFI_CRED_RECV
+#define WIFI_PROV_CRED_FAIL NETWORK_PROV_WIFI_CRED_FAIL
+#define WIFI_PROV_CRED_SUCCESS NETWORK_PROV_WIFI_CRED_SUCCESS
+#define WIFI_PROV_END NETWORK_PROV_END
+#define WIFI_PROV_SECURITY_1 NETWORK_PROV_SECURITY_1
+#define WIFI_PROV_STA_AUTH_ERROR NETWORK_PROV_WIFI_STA_AUTH_ERROR
+#define wifi_prov_sta_fail_reason_t network_prov_wifi_sta_fail_reason_t
+#define wifi_prov_mgr_config_t network_prov_mgr_config_t
+#define wifi_prov_scheme_ble network_prov_scheme_ble
+#define WIFI_PROV_SCHEME_BLE_EVENT_HANDLER_FREE_BT NETWORK_PROV_SCHEME_BLE_EVENT_HANDLER_FREE_BT
+#define wifi_prov_mgr_init network_prov_mgr_init
+#define wifi_prov_mgr_deinit network_prov_mgr_deinit
+#define wifi_prov_mgr_start_provisioning network_prov_mgr_start_provisioning
+#define wifi_prov_mgr_stop_provisioning network_prov_mgr_stop_provisioning
+#define wifi_prov_mgr_is_provisioned network_prov_mgr_is_wifi_provisioned
 
 static const char *TAG = "BLE_PROVISIONING";
 
