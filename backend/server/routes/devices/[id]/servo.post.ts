@@ -1,4 +1,5 @@
-import { getDevice } from '~/utils/deviceStorage';
+import { requireUserId } from '~/lib/currentUser';
+import { getUserDevice } from '~/utils/deviceStorage';
 import { sendServoCommand } from '~/utils/wsRuntime';
 import { updateDeviceAngles } from '~/utils/deviceStorage';
 
@@ -8,8 +9,9 @@ interface ServoRequest {
 }
 
 export default defineEventHandler(async (event) => {
+  const userId = requireUserId(event);
   const id = getRouterParam(event, 'id');
-  const device = getDevice(id!);
+  const device = await getUserDevice(userId, id!);
 
   if (!device) {
     throw createError({
@@ -37,7 +39,7 @@ export default defineEventHandler(async (event) => {
   // Сначала пытаемся через WebSocket
   const wsSent = sendServoCommand(device.id, body.servo, body.angle);
   if (wsSent) {
-    updateDeviceAngles(device.id, body.servo === 1 ? body.angle : undefined, body.servo === 2 ? body.angle : undefined);
+    await updateDeviceAngles(device.id, body.servo === 1 ? body.angle : undefined, body.servo === 2 ? body.angle : undefined);
     return { success: true, transport: 'websocket' };
   }
 
@@ -48,7 +50,7 @@ export default defineEventHandler(async (event) => {
       method: 'POST',
       body: { angle: body.angle }
     });
-    updateDeviceAngles(device.id, body.servo === 1 ? body.angle : undefined, body.servo === 2 ? body.angle : undefined);
+    await updateDeviceAngles(device.id, body.servo === 1 ? body.angle : undefined, body.servo === 2 ? body.angle : undefined);
     return { success: true, transport: 'http', response };
   } catch (error) {
     throw createError({

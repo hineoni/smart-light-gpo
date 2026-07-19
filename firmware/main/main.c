@@ -17,9 +17,11 @@
 #include "wifi_manager.h"
 #include "servo_controller.h"
 #include "led_controller.h"
+#include "uwb_positioning.h"
 #include "web_server.h"
 #include "websocket_client.h"
 #include "driver/gpio.h"
+#include "driver/uart.h"
 
 #define RESET_BUTTON_PIN GPIO_NUM_0  // GPIO0 - кнопка BOOT на большинстве ESP32
 
@@ -30,6 +32,41 @@ static device_config_t g_device_config = {0};
 
 // Флаги состояния
 static bool g_websocket_started = false;
+static TickType_t g_websocket_started_at = 0;
+
+static bool configure_uwb_for_device(uwb_positioning_config_t *uwb_config)
+{
+    if (uwb_config == NULL || !g_device_config.is_valid) {
+        return false;
+    }
+
+    uwb_config->auto_config_enabled = true;
+    uwb_config->pid = 255;
+    uwb_config->period = 5;
+
+    if (strstr(g_device_config.device_id, "14335c382ddc") != NULL) {
+        uwb_config->role = 1;
+        uwb_config->local_address = 0x0000;
+        uwb_config->peer0_address = 0x0001;
+        ESP_LOGI(TAG, "UWB role selected for %s: host local=0000 peer0=0001",
+                 g_device_config.device_id);
+        return true;
+    }
+
+    if (strstr(g_device_config.device_id, "0483085966e0") != NULL) {
+        uwb_config->role = 0;
+        uwb_config->local_address = 0x0001;
+        uwb_config->peer0_address = 0x0000;
+        ESP_LOGI(TAG, "UWB role selected for %s: tag local=0001 host=0000",
+                 g_device_config.device_id);
+        return true;
+    }
+
+    uwb_config->auto_config_enabled = false;
+    ESP_LOGW(TAG, "No fixed UWB role mapping for %s; MK8000 auto-config disabled",
+             g_device_config.device_id);
+    return false;
+}
 
 /**
  * @brief Задача для мониторинга кнопки сброса
@@ -104,6 +141,9 @@ static void periodic_task(void *pvParameters)
     while (1) {
         // Обновление сервоприводов для плавного движения
         servo_controller_task();
+
+        // Диагностика/обновление UWB-модуля
+        uwb_positioning_task();
         
         // Отправка heartbeat сообщений через WebSocket
         if (g_websocket_started && websocket_client_is_connected()) {
@@ -175,6 +215,7 @@ static void connection_monitor_task(void *pvParameters)
                 ws_ret = websocket_client_start();
                 if (ws_ret == ESP_OK) {
                     g_websocket_started = true;
+                    g_websocket_started_at = xTaskGetTickCount();
                     ESP_LOGI(TAG, "WebSocket client started successfully");
                 } else {
                     ESP_LOGE(TAG, "Failed to start WebSocket client: %s", esp_err_to_name(ws_ret));
@@ -194,6 +235,14 @@ static void connection_monitor_task(void *pvParameters)
         // Если WebSocket запущен, но WiFi отключен - останавливаем WebSocket
         if (g_websocket_started && wifi_state != WIFI_STATE_CONNECTED) {
             ESP_LOGW(TAG, "WiFi disconnected, stopping WebSocket client");
+            websocket_client_stop();
+            websocket_client_deinit();
+            g_websocket_started = false;
+        }
+
+        if (g_websocket_started && wifi_state == WIFI_STATE_CONNECTED && !websocket_client_is_connected() &&
+            (xTaskGetTickCount() - g_websocket_started_at) > pdMS_TO_TICKS(15000)) {
+            ESP_LOGW(TAG, "WebSocket disconnected while WiFi is connected, restarting client");
             websocket_client_stop();
             websocket_client_deinit();
             g_websocket_started = false;
@@ -275,6 +324,21 @@ static esp_err_t init_system(void)
     ret = led_controller_init(&led_config);
     if (ret != ESP_OK) {
         ESP_LOGE(TAG, "Failed to initialize LED controller: %s", esp_err_to_name(ret));
+        return ret;
+    }
+
+    // Инициализация UWB-модуля расположения
+    ESP_LOGI(TAG, "Initializing UWB positioning module...");
+    uwb_positioning_config_t uwb_config = {
+        .uart_num = UART_NUM_1,
+        .tx_pin = 18,
+        .rx_pin = 19,
+        .baud_rate = 115200,
+    };
+    configure_uwb_for_device(&uwb_config);
+    ret = uwb_positioning_init(&uwb_config);
+    if (ret != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to initialize UWB positioning: %s", esp_err_to_name(ret));
         return ret;
     }
     

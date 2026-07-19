@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 import 'dart:async';
 import '../services/device_service.dart';
+import '../services/auth_service.dart';
 import '../models/device_model.dart';
 import 'device_control_screen.dart';
 import 'ble_provisioning_screen.dart';
 import 'api_test_screen.dart';
+import 'login_screen.dart';
 
 class DeviceListScreen extends StatefulWidget {
   const DeviceListScreen({super.key});
@@ -21,7 +23,7 @@ class _DeviceListScreenState extends State<DeviceListScreen> {
   void initState() {
     super.initState();
     _loadDevices();
-    
+
     // Автообновление каждые 5 секунд
     _refreshTimer = Timer.periodic(const Duration(seconds: 5), (timer) {
       if (mounted) {
@@ -49,6 +51,18 @@ class _DeviceListScreenState extends State<DeviceListScreen> {
         title: const Text('Мои устройства'),
         actions: [
           IconButton(
+            icon: const Icon(Icons.logout),
+            tooltip: 'Выйти',
+            onPressed: () async {
+              await AuthService.logout();
+              if (!context.mounted) return;
+              Navigator.of(context).pushAndRemoveUntil(
+                MaterialPageRoute(builder: (_) => const LoginScreen()),
+                (_) => false,
+              );
+            },
+          ),
+          IconButton(
             icon: const Icon(Icons.api),
             tooltip: 'API Test',
             onPressed: () {
@@ -63,10 +77,13 @@ class _DeviceListScreenState extends State<DeviceListScreen> {
       floatingActionButton: FloatingActionButton(
         child: const Icon(Icons.add),
         onPressed: () async {
-          await Navigator.push(
+          final provisioned = await Navigator.push<bool>(
             context,
             MaterialPageRoute(builder: (_) => const BleProvisioningScreen()),
           );
+          if (provisioned == true) {
+            await DeviceService.claimOnlineDevices();
+          }
           setState(() {
             _loadDevices();
           });
@@ -116,7 +133,10 @@ class _DeviceListScreenState extends State<DeviceListScreen> {
                         SizedBox(height: 16),
                         Text('Нет устройств', style: TextStyle(fontSize: 18)),
                         SizedBox(height: 8),
-                        Text('Потяните вниз для обновления', style: TextStyle(fontSize: 12, color: Colors.grey)),
+                        Text(
+                          'Потяните вниз для обновления',
+                          style: TextStyle(fontSize: 12, color: Colors.grey),
+                        ),
                       ],
                     ),
                   ),

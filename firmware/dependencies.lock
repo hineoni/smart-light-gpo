@@ -1,4 +1,14 @@
 dependencies:
+  espressif/cjson:
+    component_hash: e788323270d90738662d66fffa910bfe1fba019bba087f01557e70c40485b469
+    dependencies:
+    - name: idf
+      require: private
+      version: '>=5.0'
+    source:
+      registry_url: https://components.espressif.com
+      type: service
+    version: 1.7.19~2
   espressif/esp_websocket_client:
     component_hash: ac62982fcf9b266409c2299d2b6b1844122105b35163a3b7f8d0adaa9f7eb989
     dependencies:
@@ -9,12 +19,29 @@ dependencies:
       registry_url: https://components.espressif.com/
       type: service
     version: 1.5.0
+  espressif/network_provisioning:
+    component_hash: 72d27784e3daf807418a34fb00be136ec50c6db49d989ce981d22e031fc0e7f8
+    dependencies:
+    - name: espressif/cjson
+      registry_url: https://components.espressif.com
+      require: private
+      rules:
+      - if: idf_version >= 6.0
+      version: ^1.7.19
+    - name: idf
+      require: private
+      version: '>=5.1'
+    source:
+      registry_url: https://components.espressif.com/
+      type: service
+    version: 1.2.4
   idf:
     source:
       type: idf
-    version: 5.5.1
+    version: 6.0.0
 direct_dependencies:
 - espressif/esp_websocket_client
-manifest_hash: 02d68bc2962e5c66c8a22cbcc24ccd7e60b5e1f79eb50e74b89bd65161ec502b
+- espressif/network_provisioning
+manifest_hash: 17953d78292f98497101a208f195c8b5cb90ea7730d13a3032eda7216770c922
 target: esp32
-version: 2.0.0
+version: 3.0.0

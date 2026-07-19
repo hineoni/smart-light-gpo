@@ -1,6 +1,7 @@
 #include "websocket_client.h"
 #include "servo_controller.h"
 #include "led_controller.h"
+#include "uwb_positioning.h"
 #include "cJSON.h"
 #include "esp_log.h"
 #include "freertos/FreeRTOS.h"
@@ -8,7 +9,7 @@
 #include <string.h>
 #include <stdio.h>
 
-#define HEARTBEAT_INTERVAL_MS 15000  // 15 секунд между heartbeat сообщениями (было 5)
+#define WS_HEARTBEAT_INTERVAL_MS 1000
 
 static const char *TAG = "WS_CLIENT";
 
@@ -94,14 +95,15 @@ static esp_err_t send_json_message(cJSON* json)
     
     // Пробуем отправить с retry
     for (int i = 0; i < retry_count; i++) {
-        ret = esp_websocket_client_send_text(s_websocket_client, json_string, msg_len, pdMS_TO_TICKS(1000));
+        int sent = esp_websocket_client_send_text(s_websocket_client, json_string, msg_len, pdMS_TO_TICKS(1000));
         
-        if (ret == ESP_OK) {
-            ESP_LOGD(TAG, "Message sent successfully on attempt %d", i + 1);
+        if (sent >= 0) {
+            ret = ESP_OK;
+            ESP_LOGD(TAG, "Message sent successfully on attempt %d (%d bytes)", i + 1, sent);
             break;
         } else {
-            ESP_LOGW(TAG, "Send attempt %d failed: %s (error code 0x%x)", 
-                     i + 1, esp_err_to_name(ret), ret);
+            ret = ESP_FAIL;
+            ESP_LOGW(TAG, "Send attempt %d failed: send_text returned %d", i + 1, sent);
             
             if (i < retry_count - 1) {
                 ESP_LOGD(TAG, "Retrying in 100ms...");
@@ -404,8 +406,9 @@ esp_err_t websocket_client_send_heartbeat(void)
         ESP_LOGE(TAG, "Failed to create heartbeat JSON object - out of memory?");
         return ESP_ERR_NO_MEM;
     }
-    
+
     cJSON_AddStringToObject(heartbeat_json, "type", "heartbeat");
+    cJSON_AddStringToObject(heartbeat_json, "deviceId", s_device_config.device_id);
     
     cJSON* servo1 = cJSON_CreateObject();
     if (servo1 == NULL) {
@@ -424,6 +427,50 @@ esp_err_t websocket_client_send_heartbeat(void)
     }
     cJSON_AddNumberToObject(servo2, "angle", status.angle2);
     cJSON_AddItemToObject(heartbeat_json, "servo2", servo2);
+
+    cJSON* uwb = cJSON_CreateObject();
+    cJSON* ranges = cJSON_CreateArray();
+    if (uwb != NULL && ranges != NULL) {
+        uwb_range_t current_ranges[UWB_MAX_RANGES];
+        size_t range_count = uwb_positioning_get_ranges(current_ranges, UWB_MAX_RANGES);
+        uwb_positioning_stats_t uwb_stats = {0};
+        uwb_positioning_get_stats(&uwb_stats);
+
+        for (size_t i = 0; i < range_count; i++) {
+            cJSON* range = cJSON_CreateObject();
+            if (range == NULL) {
+                continue;
+            }
+
+            cJSON_AddStringToObject(range, "peerId", current_ranges[i].peer_id);
+            cJSON_AddNumberToObject(range, "distanceM", current_ranges[i].distance_m);
+            cJSON_AddNumberToObject(range, "updatedAtMs", current_ranges[i].updated_at_ms);
+            cJSON_AddNumberToObject(range, "rssiDbm", current_ranges[i].rssi_dbm);
+            cJSON_AddItemToArray(ranges, range);
+        }
+
+        cJSON_AddItemToObject(uwb, "ranges", ranges);
+        cJSON_AddBoolToObject(uwb, "ready", uwb_positioning_is_ready());
+        cJSON_AddNumberToObject(uwb, "rangeCount", range_count);
+        cJSON_AddNumberToObject(uwb, "uartBytes", uwb_stats.total_bytes);
+        cJSON_AddNumberToObject(uwb, "discardedBytes", uwb_stats.discarded_bytes);
+        cJSON_AddNumberToObject(uwb, "parsedFrames", uwb_stats.parsed_frames);
+        cJSON_AddNumberToObject(uwb, "invalidFrames", uwb_stats.invalid_frames);
+        cJSON_AddNumberToObject(uwb, "parsedLines", uwb_stats.parsed_lines);
+        cJSON_AddNumberToObject(uwb, "invalidLines", uwb_stats.invalid_lines);
+        cJSON_AddNumberToObject(uwb, "lastByteAtMs", uwb_stats.last_byte_at_ms);
+        cJSON_AddStringToObject(uwb, "lastRxHex", uwb_stats.last_rx_hex);
+        cJSON_AddBoolToObject(uwb, "autoConfig", uwb_stats.auto_config_enabled);
+        cJSON_AddNumberToObject(uwb, "role", uwb_stats.role);
+        cJSON_AddNumberToObject(uwb, "pid", uwb_stats.pid);
+        cJSON_AddNumberToObject(uwb, "period", uwb_stats.period);
+        cJSON_AddNumberToObject(uwb, "localAddress", uwb_stats.local_address);
+        cJSON_AddNumberToObject(uwb, "peer0Address", uwb_stats.peer0_address);
+        cJSON_AddItemToObject(heartbeat_json, "uwb", uwb);
+    } else {
+        if (uwb != NULL) cJSON_Delete(uwb);
+        if (ranges != NULL) cJSON_Delete(ranges);
+    }
     
     ESP_LOGD(TAG, "Sending heartbeat with servo1=%d, servo2=%d", status.angle1, status.angle2);
     
@@ -459,8 +506,8 @@ void websocket_client_heartbeat_task(void)
 {
     TickType_t current_time = xTaskGetTickCount();
     
-    // Отправляем heartbeat каждые HEARTBEAT_INTERVAL_MS миллисекунд
-    if ((current_time - s_last_heartbeat) >= pdMS_TO_TICKS(HEARTBEAT_INTERVAL_MS)) {
+    // Отправляем heartbeat каждые WS_HEARTBEAT_INTERVAL_MS миллисекунд
+    if ((current_time - s_last_heartbeat) >= pdMS_TO_TICKS(WS_HEARTBEAT_INTERVAL_MS)) {
         if (s_is_connected) {
             websocket_client_send_heartbeat();
         }

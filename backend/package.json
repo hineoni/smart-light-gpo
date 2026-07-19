@@ -4,12 +4,22 @@
   "description": "Backend for controlling servo motors via ESP32",
   "type": "module",
   "scripts": {
-    "dev": "nitro dev --host",
+    "dev": "NODE_OPTIONS='--import ./dev-process-hooks.mjs --unhandled-rejections=warn' nitro dev --host",
     "build": "nitro build",
     "start": "node .output/server/index.mjs",
     "preview": "node .output/server/index.mjs"
   },
   "dependencies": {
-    "nitropack": "^2.12.9"
+    "@prisma/client": "^6.19.3",
+    "bcryptjs": "^3.0.3",
+    "h3": "1.15.4",
+    "jsonwebtoken": "^9.0.3",
+    "nitropack": "^2.13.4",
+    "prisma": "^6.19.3",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "@types/jsonwebtoken": "^9.0.10",
+    "@types/node": "^25.9.1"
   }
 }
