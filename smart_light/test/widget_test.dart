@@ -7,24 +7,33 @@
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:smart_light/main.dart';
+import 'package:smart_light/screens/login_screen.dart';
+import 'package:smart_light/services/app_settings.dart';
 
 void main() {
-  testWidgets('Counter increments smoke test', (WidgetTester tester) async {
-    // Build our app and trigger a frame.
-    await tester.pumpWidget(const MyApp());
+  test('settings persist the selected theme and language', () async {
+    SharedPreferences.setMockInitialValues({});
+    final settings = await AppSettings.load();
 
-    // Verify that our counter starts at 0.
-    expect(find.text('0'), findsOneWidget);
-    expect(find.text('1'), findsNothing);
+    await settings.setTheme(AppTheme.light);
+    await settings.setLocale(const Locale('en'));
+    final restored = await AppSettings.load();
 
-    // Tap the '+' icon and trigger a frame.
-    await tester.tap(find.byIcon(Icons.add));
-    await tester.pump();
+    expect(restored.theme, AppTheme.light);
+    expect(restored.locale, const Locale('en'));
+  });
 
-    // Verify that our counter has incremented.
-    expect(find.text('0'), findsNothing);
-    expect(find.text('1'), findsOneWidget);
+  testWidgets('app opens the sign-in screen without a saved session', (
+    WidgetTester tester,
+  ) async {
+    SharedPreferences.setMockInitialValues({});
+    final settings = await AppSettings.load();
+    await tester.pumpWidget(MyApp(settings: settings));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(LoginScreen), findsOneWidget);
   });
 }

@@ -1,12 +1,11 @@
 import 'package:flutter/material.dart';
 import 'dart:async';
 import '../services/device_service.dart';
-import '../services/auth_service.dart';
+import '../l10n/generated/app_localizations.dart';
 import '../models/device_model.dart';
 import 'device_control_screen.dart';
 import 'ble_provisioning_screen.dart';
 import 'api_test_screen.dart';
-import 'login_screen.dart';
 
 class DeviceListScreen extends StatefulWidget {
   const DeviceListScreen({super.key});
@@ -46,25 +45,14 @@ class _DeviceListScreenState extends State<DeviceListScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Мои устройства'),
+        title: Text(l10n.myDevices),
         actions: [
           IconButton(
-            icon: const Icon(Icons.logout),
-            tooltip: 'Выйти',
-            onPressed: () async {
-              await AuthService.logout();
-              if (!context.mounted) return;
-              Navigator.of(context).pushAndRemoveUntil(
-                MaterialPageRoute(builder: (_) => const LoginScreen()),
-                (_) => false,
-              );
-            },
-          ),
-          IconButton(
             icon: const Icon(Icons.api),
-            tooltip: 'API Test',
+            tooltip: l10n.apiTest,
             onPressed: () {
               Navigator.push(
                 context,
@@ -107,7 +95,7 @@ class _DeviceListScreenState extends State<DeviceListScreen> {
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Text('Ошибка: ${snapshot.error}'),
+                    Text(l10n.errorWithDetails(snapshot.error.toString())),
                     const SizedBox(height: 16),
                     ElevatedButton(
                       onPressed: () {
@@ -115,7 +103,7 @@ class _DeviceListScreenState extends State<DeviceListScreen> {
                           _loadDevices();
                         });
                       },
-                      child: const Text('Повторить'),
+                      child: Text(l10n.retry),
                     ),
                   ],
                 ),
@@ -123,18 +111,25 @@ class _DeviceListScreenState extends State<DeviceListScreen> {
             } else if (!snapshot.hasData || snapshot.data!.isEmpty) {
               // Важно! Для pull-to-refresh с пустым списком нужен scrollable widget
               return ListView(
-                children: const [
-                  SizedBox(height: 200), // Отступ сверху
+                children: [
+                  const SizedBox(height: 200), // Отступ сверху
                   Center(
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Icon(Icons.device_hub, size: 64, color: Colors.grey),
-                        SizedBox(height: 16),
-                        Text('Нет устройств', style: TextStyle(fontSize: 18)),
-                        SizedBox(height: 8),
+                        const Icon(
+                          Icons.device_hub,
+                          size: 64,
+                          color: Colors.grey,
+                        ),
+                        const SizedBox(height: 16),
                         Text(
-                          'Потяните вниз для обновления',
+                          l10n.noDevices,
+                          style: const TextStyle(fontSize: 18),
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          l10n.pullToRefresh,
                           style: TextStyle(fontSize: 12, color: Colors.grey),
                         ),
                       ],
@@ -185,8 +180,8 @@ class _DeviceListScreenState extends State<DeviceListScreen> {
             children: [
               TextField(
                 controller: _controller,
-                decoration: const InputDecoration(
-                  labelText: 'Переименовать устройство',
+                decoration: InputDecoration(
+                  labelText: AppLocalizations.of(context)!.renameDevice,
                 ),
               ),
               const SizedBox(height: 10),
@@ -204,7 +199,7 @@ class _DeviceListScreenState extends State<DeviceListScreen> {
                       });
                       Navigator.pop(context);
                     },
-                    child: const Text('Сохранить'),
+                    child: Text(AppLocalizations.of(context)!.save),
                   ),
                   ElevatedButton(
                     style: ElevatedButton.styleFrom(
@@ -217,7 +212,7 @@ class _DeviceListScreenState extends State<DeviceListScreen> {
                       });
                       Navigator.pop(context);
                     },
-                    child: const Text('Удалить'),
+                    child: Text(AppLocalizations.of(context)!.delete),
                   ),
                 ],
               ),
