@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../l10n/generated/app_localizations.dart';
+import '../services/app_settings.dart';
 import '../services/auth_service.dart';
 
 class RegisterScreen extends StatefulWidget {
@@ -29,32 +31,36 @@ class _RegisterScreenState extends State<RegisterScreen> {
   }
 
   String? _nameValidator(String? value) {
+    final l10n = AppLocalizations.of(context)!;
     final name = (value ?? '').trim();
-    if (name.isEmpty) return 'Введите имя';
-    if (name.length < 2) return 'Минимум 2 символа';
+    if (name.isEmpty) return l10n.enterName;
+    if (name.length < 2) return l10n.minimumTwoCharacters;
     return null;
   }
 
   String? _emailValidator(String? value) {
+    final l10n = AppLocalizations.of(context)!;
     final email = (value ?? '').trim();
-    if (email.isEmpty) return 'Введите email';
+    if (email.isEmpty) return l10n.enterEmail;
     if (!RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$').hasMatch(email)) {
-      return 'Некорректный email';
+      return l10n.invalidEmail;
     }
     return null;
   }
 
   String? _passwordValidator(String? value) {
+    final l10n = AppLocalizations.of(context)!;
     final password = value ?? '';
-    if (password.isEmpty) return 'Введите пароль';
-    if (password.length < 6) return 'Минимум 6 символов';
+    if (password.isEmpty) return l10n.enterPassword;
+    if (password.length < 6) return l10n.minimumSixCharacters;
     return null;
   }
 
   String? _confirmValidator(String? value) {
+    final l10n = AppLocalizations.of(context)!;
     final password = value ?? '';
-    if (password.isEmpty) return 'Повторите пароль';
-    if (password != _passCtrl.text) return 'Пароли не совпадают';
+    if (password.isEmpty) return l10n.repeatPassword;
+    if (password != _passCtrl.text) return l10n.passwordsDoNotMatch;
     return null;
   }
 
@@ -74,9 +80,12 @@ class _RegisterScreenState extends State<RegisterScreen> {
     setState(() => _loading = false);
 
     if (!success) {
+      final l10n = AppLocalizations.of(context)!;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Пользователь с таким email уже существует'),
+        SnackBar(
+          content: Text(
+            AuthService.lastErrorMessage ?? l10n.registrationFailed,
+          ),
         ),
       );
       return;
@@ -87,19 +96,22 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     return Scaffold(
-      appBar: AppBar(title: const Text('Регистрация')),
+      appBar: AppBar(actions: [_RegisterLanguageMenu()]),
       body: SafeArea(
         child: Center(
           child: ConstrainedBox(
             constraints: const BoxConstraints(maxWidth: 420),
             child: ListView(
+              shrinkWrap: true,
               padding: const EdgeInsets.all(16),
               children: [
                 const SizedBox(height: 12),
                 Text(
-                  'Создать аккаунт',
+                  l10n.createAccount,
                   style: Theme.of(context).textTheme.headlineSmall,
+                  textAlign: TextAlign.center,
                 ),
                 const SizedBox(height: 16),
                 Form(
@@ -109,8 +121,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       TextFormField(
                         controller: _nameCtrl,
                         textInputAction: TextInputAction.next,
-                        decoration: const InputDecoration(
-                          labelText: 'Имя',
+                        decoration: InputDecoration(
+                          labelText: l10n.name,
                           prefixIcon: Icon(Icons.person_outline),
                         ),
                         validator: _nameValidator,
@@ -120,8 +132,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
                         controller: _emailCtrl,
                         keyboardType: TextInputType.emailAddress,
                         textInputAction: TextInputAction.next,
-                        decoration: const InputDecoration(
-                          labelText: 'Email',
+                        decoration: InputDecoration(
+                          labelText: l10n.email,
                           prefixIcon: Icon(Icons.email_outlined),
                         ),
                         validator: _emailValidator,
@@ -132,7 +144,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                         obscureText: _hidePass,
                         textInputAction: TextInputAction.next,
                         decoration: InputDecoration(
-                          labelText: 'Пароль',
+                          labelText: l10n.password,
                           prefixIcon: const Icon(Icons.lock_outline),
                           suffixIcon: IconButton(
                             onPressed: () {
@@ -153,7 +165,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                         obscureText: _hideConfirm,
                         textInputAction: TextInputAction.done,
                         decoration: InputDecoration(
-                          labelText: 'Повторите пароль',
+                          labelText: l10n.confirmPassword,
                           prefixIcon: const Icon(Icons.lock_outline),
                           suffixIcon: IconButton(
                             onPressed: () {
@@ -183,7 +195,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                                     strokeWidth: 2,
                                   ),
                                 )
-                              : const Text('Зарегистрироваться'),
+                              : Text(l10n.register),
                         ),
                       ),
                       const SizedBox(height: 8),
@@ -191,7 +203,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                         onPressed: _loading
                             ? null
                             : () => Navigator.of(context).pop(),
-                        child: const Text('Уже есть аккаунт? Войти'),
+                        child: Text(l10n.alreadyHaveAccount),
                       ),
                     ],
                   ),
@@ -203,4 +215,16 @@ class _RegisterScreenState extends State<RegisterScreen> {
       ),
     );
   }
+}
+
+class _RegisterLanguageMenu extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) => PopupMenuButton<String>(
+    icon: const Icon(Icons.language),
+    onSelected: (code) => AppSettings.instance.setLocale(Locale(code)),
+    itemBuilder: (context) => const [
+      PopupMenuItem(value: 'ru', child: Text('Русский')),
+      PopupMenuItem(value: 'en', child: Text('English')),
+    ],
+  );
 }

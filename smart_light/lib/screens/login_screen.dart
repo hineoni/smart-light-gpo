@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../l10n/generated/app_localizations.dart';
+import '../services/app_settings.dart';
 import '../services/auth_service.dart';
 import 'main_navigation_screen.dart';
 import 'register_screen.dart';
@@ -26,18 +28,20 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   String? _emailValidator(String? value) {
+    final l10n = AppLocalizations.of(context)!;
     final email = (value ?? '').trim();
-    if (email.isEmpty) return 'Введите email';
+    if (email.isEmpty) return l10n.enterEmail;
     if (!RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$').hasMatch(email)) {
-      return 'Некорректный email';
+      return l10n.invalidEmail;
     }
     return null;
   }
 
   String? _passwordValidator(String? value) {
+    final l10n = AppLocalizations.of(context)!;
     final password = value ?? '';
-    if (password.isEmpty) return 'Введите пароль';
-    if (password.length < 6) return 'Минимум 6 символов';
+    if (password.isEmpty) return l10n.enterPassword;
+    if (password.length < 6) return l10n.minimumSixCharacters;
     return null;
   }
 
@@ -53,8 +57,13 @@ class _LoginScreenState extends State<LoginScreen> {
     setState(() => _loading = false);
 
     if (!success) {
+      final l10n = AppLocalizations.of(context)!;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Неверный email или пароль')),
+        SnackBar(
+          content: Text(
+            AuthService.lastErrorMessage ?? l10n.invalidEmailOrPassword,
+          ),
+        ),
       );
       return;
     }
@@ -81,19 +90,22 @@ class _LoginScreenState extends State<LoginScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     return Scaffold(
-      appBar: AppBar(title: const Text('Вход')),
+      appBar: AppBar(actions: [_LanguageMenu()]),
       body: SafeArea(
         child: Center(
           child: ConstrainedBox(
             constraints: const BoxConstraints(maxWidth: 420),
             child: ListView(
+              shrinkWrap: true,
               padding: const EdgeInsets.all(16),
               children: [
                 const SizedBox(height: 12),
                 Text(
-                  'Войти в аккаунт',
+                  l10n.signInToAccount,
                   style: Theme.of(context).textTheme.headlineSmall,
+                  textAlign: TextAlign.center,
                 ),
                 const SizedBox(height: 16),
                 Form(
@@ -104,8 +116,8 @@ class _LoginScreenState extends State<LoginScreen> {
                         controller: _emailCtrl,
                         keyboardType: TextInputType.emailAddress,
                         textInputAction: TextInputAction.next,
-                        decoration: const InputDecoration(
-                          labelText: 'Email',
+                        decoration: InputDecoration(
+                          labelText: l10n.email,
                           prefixIcon: Icon(Icons.email_outlined),
                         ),
                         validator: _emailValidator,
@@ -116,7 +128,7 @@ class _LoginScreenState extends State<LoginScreen> {
                         obscureText: _hidePass,
                         textInputAction: TextInputAction.done,
                         decoration: InputDecoration(
-                          labelText: 'Пароль',
+                          labelText: l10n.password,
                           prefixIcon: const Icon(Icons.lock_outline),
                           suffixIcon: IconButton(
                             onPressed: () {
@@ -146,13 +158,13 @@ class _LoginScreenState extends State<LoginScreen> {
                                     strokeWidth: 2,
                                   ),
                                 )
-                              : const Text('Войти'),
+                              : Text(l10n.signIn),
                         ),
                       ),
                       const SizedBox(height: 8),
                       TextButton(
                         onPressed: _loading ? null : _openRegister,
-                        child: const Text('Нет аккаунта? Зарегистрироваться'),
+                        child: Text(l10n.noAccountRegister),
                       ),
                     ],
                   ),
@@ -164,4 +176,16 @@ class _LoginScreenState extends State<LoginScreen> {
       ),
     );
   }
+}
+
+class _LanguageMenu extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) => PopupMenuButton<String>(
+    icon: const Icon(Icons.language),
+    onSelected: (code) => AppSettings.instance.setLocale(Locale(code)),
+    itemBuilder: (context) => const [
+      PopupMenuItem(value: 'ru', child: Text('Русский')),
+      PopupMenuItem(value: 'en', child: Text('English')),
+    ],
+  );
 }

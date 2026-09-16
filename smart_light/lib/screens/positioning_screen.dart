@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import '../l10n/generated/app_localizations.dart';
 
 import '../models/device_distance_model.dart';
 import '../models/device_model.dart';
@@ -98,13 +99,14 @@ class _PositioningScreenState extends State<PositioningScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Расположение'),
+        title: Text(l10n.positioning),
         actions: [
           IconButton(
             icon: const Icon(Icons.refresh),
-            tooltip: 'Обновить',
+            tooltip: l10n.refresh,
             onPressed: _loadData,
           ),
         ],

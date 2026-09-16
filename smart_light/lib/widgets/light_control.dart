@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../l10n/generated/app_localizations.dart';
 
 class LightControl extends StatelessWidget {
   final double brightness;
@@ -28,7 +29,7 @@ class LightControl extends StatelessWidget {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                const Text('Освещение'),
+                Text(AppLocalizations.of(context)!.lighting),
                 Switch(
                   value: isLightOn,
                   onChanged: (_) => onToggleLight(),
@@ -61,7 +62,7 @@ class LightControl extends StatelessWidget {
                   _colorButton(Colors.yellow),
                 ],
               ),
-            )
+            ),
           ],
         ),
       ),
