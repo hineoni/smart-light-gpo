@@ -1,4 +1,4 @@
-import { createError, defineEventHandler, getHeader, getMethod } from 'h3';
+import { createError, defineEventHandler, getHeader, getMethod, sendNoContent } from 'h3';
 import { verifyAccessToken } from '../lib/auth';
 
 const publicPrefixes = [
@@ -21,8 +21,7 @@ export default defineEventHandler((event) => {
   event.node.res.setHeader('Access-Control-Allow-Headers', 'Authorization,Content-Type');
 
   if (getMethod(event) === 'OPTIONS') {
-    event.node.res.statusCode = 204;
-    return;
+    return sendNoContent(event);
   }
 
   if (path === '/' || publicPrefixes.some((prefix) => path.startsWith(prefix))) {
