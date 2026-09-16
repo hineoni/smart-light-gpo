@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 
+import '../services/api_config.dart';
+
 class ApiTestScreen extends StatefulWidget {
   const ApiTestScreen({super.key});
 
@@ -10,8 +12,6 @@ class ApiTestScreen extends StatefulWidget {
 }
 
 class _ApiTestScreenState extends State<ApiTestScreen> {
-  static const String _baseUrl = 'http://172.20.10.13:3000';
-
   final TextEditingController _deviceIdController = TextEditingController(
     text: 'smartlight_0483085966e0',
   );
@@ -37,7 +37,7 @@ class _ApiTestScreenState extends State<ApiTestScreen> {
 
   Future<void> _testGet(String path) async {
     try {
-      final response = await http.get(Uri.parse('$_baseUrl$path'));
+      final response = await http.get(ApiConfig.uri(path));
       setState(() {
         _response =
             'GET $path\nStatus: ${response.statusCode}\nBody: ${_prettyBody(response.body)}';
@@ -65,7 +65,7 @@ class _ApiTestScreenState extends State<ApiTestScreen> {
         'servo2Angle': int.parse(_servo2Controller.text),
       });
       final response = await http.post(
-        Uri.parse('$_baseUrl/devices/${_deviceIdController.text}/servo'),
+        ApiConfig.uri('/devices/${_deviceIdController.text}/servo'),
         headers: {'Content-Type': 'application/json'},
         body: body,
       );
@@ -89,7 +89,7 @@ class _ApiTestScreenState extends State<ApiTestScreen> {
         'colorB': int.parse(_colorBController.text),
       });
       final response = await http.post(
-        Uri.parse('$_baseUrl/devices/${_deviceIdController.text}/led'),
+        ApiConfig.uri('/devices/${_deviceIdController.text}/led'),
         headers: {'Content-Type': 'application/json'},
         body: body,
       );
