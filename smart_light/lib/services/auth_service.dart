@@ -3,13 +3,15 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'api_config.dart';
+
 class AuthService {
-  static const String baseUrl = 'http://172.20.10.13:3000';
   static const String _accessTokenKey = 'auth.accessToken';
   static const String _refreshTokenKey = 'auth.refreshToken';
 
   static String? accessToken;
   static String? refreshToken;
+  static String? lastErrorMessage;
 
   static Map<String, String> get authHeaders {
     final token = accessToken;
@@ -20,18 +22,29 @@ class AuthService {
   }
 
   static Future<bool> login(String email, String password) async {
-    final response = await http.post(
-      Uri.parse('$baseUrl/auth/login'),
-      headers: {'Content-Type': 'application/json'},
-      body: jsonEncode({'email': email.trim(), 'password': password}),
-    );
+    lastErrorMessage = null;
 
-    if (response.statusCode == 200) {
-      final data = jsonDecode(response.body) as Map<String, dynamic>;
-      accessToken = data['accessToken'] as String?;
-      refreshToken = data['refreshToken'] as String?;
-      await _persistTokens();
-      return accessToken != null;
+    try {
+      final response = await http.post(
+        ApiConfig.uri('/auth/login'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({'email': email.trim(), 'password': password}),
+      );
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body) as Map<String, dynamic>;
+        accessToken = data['accessToken'] as String?;
+        refreshToken = data['refreshToken'] as String?;
+        await _persistTokens();
+        return accessToken != null;
+      }
+
+      lastErrorMessage = response.statusCode == 401
+          ? 'Неверный email или пароль'
+          : _messageFromResponse(response, 'Не удалось войти');
+    } catch (e) {
+      lastErrorMessage =
+          'Не удалось подключиться к серверу ${ApiConfig.baseUrl}: $e';
     }
 
     return false;
@@ -42,21 +55,38 @@ class AuthService {
     String password, {
     String? name,
   }) async {
-    final response = await http.post(
-      Uri.parse('$baseUrl/auth/register'),
-      headers: {'Content-Type': 'application/json'},
-      body: jsonEncode({
-        'email': email.trim(),
-        'password': password,
-        if (name != null && name.trim().isNotEmpty) 'name': name.trim(),
-      }),
-    );
+    lastErrorMessage = null;
 
-    if (response.statusCode != 200 && response.statusCode != 201) {
+    try {
+      final response = await http.post(
+        ApiConfig.uri('/auth/register'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({
+          'email': email.trim(),
+          'password': password,
+          if (name != null && name.trim().isNotEmpty) 'name': name.trim(),
+        }),
+      );
+
+      if (response.statusCode != 200 && response.statusCode != 201) {
+        lastErrorMessage = response.statusCode == 409
+            ? 'Пользователь с таким email уже существует'
+            : _messageFromResponse(response, 'Не удалось зарегистрироваться');
+        return false;
+      }
+
+      final loggedIn = await login(email, password);
+      if (!loggedIn) {
+        lastErrorMessage =
+            'Аккаунт создан, но автоматически войти не удалось. ${lastErrorMessage ?? ''}'
+                .trim();
+      }
+      return loggedIn;
+    } catch (e) {
+      lastErrorMessage =
+          'Не удалось подключиться к серверу ${ApiConfig.baseUrl}: $e';
       return false;
     }
-
-    return login(email, password);
   }
 
   static Future<bool> restoreSession() async {
@@ -78,7 +108,7 @@ class AuthService {
     }
 
     final response = await http.post(
-      Uri.parse('$baseUrl/auth/refresh'),
+      ApiConfig.uri('/auth/refresh'),
       headers: {'Content-Type': 'application/json'},
       body: jsonEncode({'refreshToken': token}),
     );
@@ -118,12 +148,25 @@ class AuthService {
   static Future<bool> _checkCurrentUser() async {
     try {
       final response = await http.get(
-        Uri.parse('$baseUrl/auth/me'),
+        ApiConfig.uri('/auth/me'),
         headers: authHeaders,
       );
       return response.statusCode == 200;
     } catch (_) {
       return false;
     }
+  }
+
+  static String _messageFromResponse(http.Response response, String fallback) {
+    try {
+      final body = jsonDecode(response.body);
+      if (body is Map<String, dynamic>) {
+        final message = body['statusMessage'] ?? body['message'];
+        if (message is String && message.isNotEmpty) return message;
+      }
+    } catch (_) {
+      // Keep the fallback below for non-JSON error responses.
+    }
+    return '$fallback (${response.statusCode})';
   }
 }

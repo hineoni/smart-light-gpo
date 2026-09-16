@@ -3,33 +3,33 @@ import 'package:http/http.dart' as http;
 import '../models/device_model.dart';
 import '../models/device_distance_model.dart';
 import '../models/light_scene_model.dart';
+import 'api_config.dart';
 import 'auth_service.dart';
 
 class DeviceService {
-  static const String baseUrl =
-      'http://172.20.10.13:3000'; // Измените на IP бекенда если нужно
-
   static Map<String, String> get _headers => AuthService.authHeaders;
 
   static Future<http.Response> _get(String path) {
-    return http.get(Uri.parse('$baseUrl$path'), headers: _headers);
+    return http.get(ApiConfig.uri(path), headers: _headers);
   }
 
   static Future<http.Response> _post(String path, {Object? body}) {
-    return http.post(Uri.parse('$baseUrl$path'), headers: _headers, body: body);
+    return http.post(ApiConfig.uri(path), headers: _headers, body: body);
   }
 
   static Future<http.Response> _put(String path, {Object? body}) {
-    return http.put(Uri.parse('$baseUrl$path'), headers: _headers, body: body);
+    return http.put(ApiConfig.uri(path), headers: _headers, body: body);
   }
 
   static Future<http.Response> _delete(String path) {
-    return http.delete(Uri.parse('$baseUrl$path'), headers: _headers);
+    return http.delete(ApiConfig.uri(path), headers: _headers);
   }
 
   static Future<List<DeviceModel>> getDevices() async {
     try {
-      print('[DEVICE_SERVICE] Requesting devices from $baseUrl/devices');
+      print(
+        '[DEVICE_SERVICE] Requesting devices from ${ApiConfig.baseUrl}/devices',
+      );
       // Сначала пробуем /devices (все устройства)
       final response = await _get('/devices');
       print('[DEVICE_SERVICE] Response status: ${response.statusCode}');
@@ -53,7 +53,9 @@ class DeviceService {
         return devices;
       } else {
         // Если /devices не работает, пробуем /devices/online
-        print('[DEVICE_SERVICE] Trying fallback: $baseUrl/devices/online');
+        print(
+          '[DEVICE_SERVICE] Trying fallback: ${ApiConfig.baseUrl}/devices/online',
+        );
         final fallbackResponse = await _get('/devices/online');
         print(
           '[DEVICE_SERVICE] Fallback status: ${fallbackResponse.statusCode}',
