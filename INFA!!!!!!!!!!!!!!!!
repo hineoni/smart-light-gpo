@@ -1,0 +1,6 @@
+Я не менял ip, так что для запуска локально, надо указать локалхсоты или ваш ip, также вам необходимо будет заполнить файл .env, в репо есть .env example
+для генерации jwt я использую- https://toolact.com/ru/jwt-generator. Ну и там надо будет поменять путь к бд. Если бд нет, то надо создать: 
+Database: smart_light
+User: postgres
+Надо будет создать миграции: pnpm exec prisma migrate deploy
+Для запуска флаттера: flutter run -d windows --dart-define=API_BASE_URL=http://localhost:3000 (винда)
