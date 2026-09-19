@@ -92,7 +92,12 @@ class _LoginScreenState extends State<LoginScreen> {
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
     return Scaffold(
-      appBar: AppBar(actions: [_LanguageMenu()]),
+      appBar: AppBar(
+        actions: [
+          const _ThemeToggleButton(),
+          _LanguageMenu(),
+        ],
+      ),
       body: SafeArea(
         child: Center(
           child: ConstrainedBox(
@@ -188,4 +193,29 @@ class _LanguageMenu extends StatelessWidget {
       PopupMenuItem(value: 'en', child: Text('English')),
     ],
   );
+}
+
+class _ThemeToggleButton extends StatelessWidget {
+  const _ThemeToggleButton();
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: AppSettings.instance,
+      builder: (context, _) {
+        final isDark = AppSettings.instance.theme == AppTheme.dark;
+        return IconButton(
+          tooltip: isDark ? 'Use light theme' : 'Use dark theme',
+          icon: Icon(
+            isDark ? Icons.light_mode_outlined : Icons.dark_mode_outlined,
+          ),
+          onPressed: () {
+            AppSettings.instance.setTheme(
+              isDark ? AppTheme.light : AppTheme.dark,
+            );
+          },
+        );
+      },
+    );
+  }
 }

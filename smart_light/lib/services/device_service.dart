@@ -317,6 +317,25 @@ class DeviceService {
     return null;
   }
 
+  static Future<LightSceneModel?> createPresetScene(
+    String key, {
+    String? zoneId,
+  }) async {
+    try {
+      final response = await _post(
+        '/scenes/presets',
+        body: json.encode({'key': key, if (zoneId != null) 'zoneId': zoneId}),
+      ).timeout(const Duration(seconds: 5));
+
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        return LightSceneModel.fromJson(json.decode(response.body));
+      }
+    } catch (e) {
+      print('[DEVICE_SERVICE] Error creating preset scene: $e');
+    }
+    return null;
+  }
+
   static Future<bool> applyScene(String sceneId) async {
     try {
       final response = await _post(
