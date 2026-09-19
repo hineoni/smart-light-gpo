@@ -168,7 +168,7 @@ class _DeviceListScreenState extends State<DeviceListScreen> {
   }
 
   void _showDeviceOptions(BuildContext context, DeviceModel device) {
-    final _controller = TextEditingController(text: device.name);
+    final controller = TextEditingController(text: device.name);
 
     showModalBottomSheet(
       context: context,
@@ -179,7 +179,7 @@ class _DeviceListScreenState extends State<DeviceListScreen> {
             mainAxisSize: MainAxisSize.min,
             children: [
               TextField(
-                controller: _controller,
+                controller: controller,
                 decoration: InputDecoration(
                   labelText: AppLocalizations.of(context)!.renameDevice,
                 ),
@@ -192,7 +192,7 @@ class _DeviceListScreenState extends State<DeviceListScreen> {
                     onPressed: () async {
                       await DeviceService.renameDevice(
                         device.id,
-                        _controller.text,
+                        controller.text,
                       );
                       setState(() {
                         _loadDevices();

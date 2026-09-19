@@ -33,7 +33,7 @@ class LightControl extends StatelessWidget {
                 Switch(
                   value: isLightOn,
                   onChanged: (_) => onToggleLight(),
-                  activeColor: Colors.blue,
+                  activeThumbColor: Colors.blue,
                 ),
               ],
             ),

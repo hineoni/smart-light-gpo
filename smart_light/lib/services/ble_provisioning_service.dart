@@ -41,7 +41,7 @@ class BleProvisioningService {
         if (results.isNotEmpty) {
           for (ScanResult result in results) {
             String? name = result.device.localName;
-            if (name != null && name.startsWith(devicePrefix) && !foundDevices.contains(name)) {
+            if (name.startsWith(devicePrefix) && !foundDevices.contains(name)) {
               foundDevices.add(name);
               print('Found device: $name');
             }

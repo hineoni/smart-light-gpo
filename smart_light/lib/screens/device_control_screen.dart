@@ -3,8 +3,6 @@ import '../l10n/generated/app_localizations.dart';
 import 'dart:async';
 import '../models/device_model.dart';
 import '../services/device_service.dart';
-import '../widgets/servo_control.dart';
-import '../widgets/circular_servo_control.dart';
 import '../widgets/compact_servo_control.dart';
 import '../widgets/light_control.dart';
 

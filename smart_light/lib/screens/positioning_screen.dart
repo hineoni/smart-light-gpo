@@ -176,6 +176,11 @@ class _PositioningScreenState extends State<PositioningScreen> {
                   tooltip: 'Новая сцена',
                   onPressed: _isSavingScene ? null : _showSaveSceneSheet,
                 ),
+                IconButton(
+                  icon: const Icon(Icons.auto_awesome),
+                  tooltip: 'Готовые сценарии',
+                  onPressed: _showPresetScenesSheet,
+                ),
               ],
             ),
             const SizedBox(height: 4),
@@ -420,6 +425,51 @@ class _PositioningScreenState extends State<PositioningScreen> {
 
     if (result == null) return;
     await _saveCurrentScene(result.name, result.zoneId);
+  }
+
+  Future<void> _showPresetScenesSheet() async {
+    const presets = [
+      ('portrait', 'Портретная съёмка', 'Мягкий тёплый свет для лица.'),
+      ('product', 'Предметная съёмка', 'Яркий нейтральный свет для деталей.'),
+      ('video', 'Видео и стрим', 'Ровный свет для камеры.'),
+      ('evening', 'Тёплый вечер', 'Уютный свет невысокой яркости.'),
+      ('night', 'Ночной режим', 'Минимальный янтарный свет.'),
+    ];
+
+    final selected = await showModalBottomSheet<String>(
+      context: context,
+      builder: (context) => SafeArea(
+        child: ListView(
+          shrinkWrap: true,
+          children: [
+            const ListTile(
+              title: Text('Готовые сценарии'),
+              subtitle: Text('Выбери пресет, чтобы создать его из твоих устройств.'),
+            ),
+            ...presets.map((preset) => ListTile(
+              leading: const Icon(Icons.light_mode_outlined),
+              title: Text(preset.$2),
+              subtitle: Text(preset.$3),
+              onTap: () => Navigator.pop(context, preset.$1),
+            )),
+          ],
+        ),
+      ),
+    );
+
+    if (selected == null || !mounted) return;
+    setState(() => _isSavingScene = true);
+    final scene = await DeviceService.createPresetScene(
+      selected,
+      zoneId: _selectedZoneId,
+    );
+    if (!mounted) return;
+    setState(() => _isSavingScene = false);
+    await _loadData(showLoader: false);
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(scene == null ? 'Не удалось создать сценарий' : 'Сценарий создан')),
+    );
   }
 
   Future<void> _showEditSceneSheet(LightSceneModel scene) async {

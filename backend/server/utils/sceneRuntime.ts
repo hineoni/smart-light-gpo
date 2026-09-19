@@ -34,6 +34,49 @@ export interface SceneDeviceState {
   heightM?: number;
 }
 
+export const scenePresets = [
+  {
+    key: 'portrait',
+    name: 'Портретная съёмка',
+    description: 'Мягкий тёплый ключевой свет и более спокойное заполнение.',
+    brightness: 0.68,
+    color: [255, 218, 190],
+    poses: [[112, 78], [68, 102]],
+  },
+  {
+    key: 'product',
+    name: 'Предметная съёмка',
+    description: 'Яркий нейтральный свет для деталей и цвета объекта.',
+    brightness: 0.86,
+    color: [245, 248, 255],
+    poses: [[98, 82], [82, 98]],
+  },
+  {
+    key: 'video',
+    name: 'Видео и стрим',
+    description: 'Ровный нейтральный свет без резких перепадов.',
+    brightness: 0.58,
+    color: [255, 236, 218],
+    poses: [[105, 86], [75, 94]],
+  },
+  {
+    key: 'evening',
+    name: 'Тёплый вечер',
+    description: 'Невысокая яркость и тёплый уютный оттенок.',
+    brightness: 0.34,
+    color: [255, 158, 82],
+    poses: [[90, 90], [90, 90]],
+  },
+  {
+    key: 'night',
+    name: 'Ночной режим',
+    description: 'Минимальный янтарный свет, чтобы не слепить глаза.',
+    brightness: 0.12,
+    color: [255, 72, 32],
+    poses: [[90, 90], [90, 90]],
+  },
+] as const;
+
 function nowIso() {
   return new Date().toISOString();
 }
@@ -307,6 +350,50 @@ async function buildSceneDeviceStates(userId: string, zoneId?: string): Promise<
       heightM: zone?.heightM,
     };
   });
+}
+
+export async function createPresetScene(
+  userId: string,
+  presetKey: string,
+  zoneId?: string,
+) {
+  const preset = scenePresets.find(item => item.key === presetKey);
+  if (!preset) throw new Error(`Unknown scene preset: ${presetKey}`);
+
+  await ensureDefaultZones(userId);
+  if (zoneId) {
+    const zone = await prisma.zone.findFirst({ where: { id: zoneId, userId } });
+    if (!zone) throw new Error(`Zone ${zoneId} not found`);
+  }
+
+  const devices = await buildSceneDeviceStates(userId, zoneId);
+  const scene = await prisma.lightScene.create({
+    data: {
+      userId,
+      name: preset.name,
+      zoneId,
+      positioningSnapshot: getPositioningSummary(onlineDevices()) as any,
+      devices: {
+        create: devices.map((device, index) => ({
+          deviceId: device.deviceId,
+          zoneId: device.zoneId,
+          brightness: preset.brightness * 255,
+          colorR: preset.color[0],
+          colorG: preset.color[1],
+          colorB: preset.color[2],
+          servo1Angle: preset.poses[index % preset.poses.length][0],
+          servo2Angle: preset.poses[index % preset.poses.length][1],
+          uwbLocalAddress: device.uwbLocalAddress,
+          x: device.x,
+          y: device.y,
+          heightM: device.heightM,
+        })),
+      },
+    },
+    include: { devices: true },
+  });
+
+  return toScene(scene);
 }
 
 export async function saveScene(
