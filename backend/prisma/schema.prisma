@@ -18,8 +18,24 @@ model User {
   zones         Zone[]
   scenes        LightScene[]
   refreshTokens RefreshToken[]
+
+  emailVerifiedAt        DateTime?
+  emailVerificationCodes EmailVerificationCode[]
 }
 
+model EmailVerificationCode {
+  id        String    @id @default(cuid())
+  userId    String
+  codeHash  String
+  expiresAt DateTime
+  attempts  Int       @default(0)
+  createdAt DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("emailVerificatinCode")
+}
 model RefreshToken {
   id        String    @id @default(cuid())
   token     String    @unique

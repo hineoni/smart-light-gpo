@@ -25,17 +25,17 @@ class _AddDeviceScreenState extends State<AddDeviceScreen> {
           children: [
             TextField(
               controller: _nameController,
-              decoration: const InputDecoration(labelText: l10n.deviceName),
+              decoration: InputDecoration(labelText: l10n.deviceName),
             ),
             TextField(
               controller: _idController,
-              decoration: const InputDecoration(
+              decoration: InputDecoration(
                 labelText: l10n.optionalDeviceId,
               ),
             ),
             TextField(
               controller: _ipController,
-              decoration: const InputDecoration(
+              decoration: InputDecoration(
                 labelText: l10n.optionalIpAddress,
               ),
             ),

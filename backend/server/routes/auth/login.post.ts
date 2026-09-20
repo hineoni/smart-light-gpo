@@ -26,6 +26,13 @@ export default defineEventHandler(async (event) => {
     });
   }
 
+  if (!user.emailVerifiedAt) {
+    throw createError({
+      statusCode: 403,
+      statusMessage: 'Email is not verified',
+    });
+  }
+
   const payload = {
     userId: user.id,
     email: user.email,

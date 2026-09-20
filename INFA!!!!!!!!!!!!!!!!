@@ -4,3 +4,9 @@ Database: smart_light
 User: postgres
 Надо будет создать миграции: pnpm exec prisma migrate deploy
 Для запуска флаттера: flutter run -d windows --dart-define=API_BASE_URL=http://localhost:3000 (винда)
+
+
+убрал надпись debug
+добавил проверку почты
+там есть файл .env.example, напишите мне, я всё скину
+внимание, так как resend в тестовом виде, он отправляет код только на почту сыркина

@@ -2,6 +2,11 @@ import { createError, defineEventHandler, readBody } from 'h3';
 import { z } from 'zod';
 import { hashPassword } from '../../lib/auth';
 import { prisma } from '../../lib/prisma';
+import {
+  createVerificationCode,
+  hashVerificationCode,
+} from '../../lib/email_verification';
+import { sendVerificationEmail } from '../../lib/mailer';
 
 const schema = z.object({
   email: z.string().email(),
@@ -16,29 +21,55 @@ export default defineEventHandler(async (event) => {
     where: { email: data.email },
   });
 
-  if (existingUser) {
+  if (existingUser?.emailVerifiedAt) {
     throw createError({
       statusCode: 409,
       statusMessage: 'User already exists',
     });
   }
 
-  const user = await prisma.user.create({
+  const user = existingUser ?? await prisma.user.create({
+      data: {
+        email: data.email,
+        passwordHash: await hashPassword(data.password),
+        name: data.name,
+      },
+      select: {
+        id: true,
+        email: true,
+        name: true,
+        createdAt: true,
+        emailVerifiedAt: true,
+      },
+    });
+
+  const code = createVerificationCode();
+
+  await prisma.emailVerificationCode.deleteMany({
+    where: { userId: user.id },
+  });
+
+  await prisma.emailVerificationCode.create({
     data: {
-      email: data.email,
-      passwordHash: await hashPassword(data.password),
-      name: data.name,
-    },
-    select: {
-      id: true,
-      email: true,
-      name: true,
-      createdAt: true,
+      userId: user.id,
+      codeHash: hashVerificationCode(code),
+      expiresAt: new Date(Date.now() + 10 * 60 * 1000),
     },
   });
 
+  try {
+    await sendVerificationEmail(user.email, code);
+  } catch (error) {
+    console.error('Unable to send verification email', error);
+    throw createError({
+      statusCode: 503,
+      statusMessage: 'Unable to send verification email. Please try again later.',
+    });
+  }
+
   return {
     success: true,
-    user,
+    email: user.email,
+    verificationRequired: true,
   };
 });
