@@ -75,18 +75,43 @@ class AuthService {
         return false;
       }
 
-      final loggedIn = await login(email, password);
-      if (!loggedIn) {
-        lastErrorMessage =
-            'Аккаунт создан, но автоматически войти не удалось. ${lastErrorMessage ?? ''}'
-                .trim();
-      }
-      return loggedIn;
+      // Вход выполняется только после подтверждения e-mail через /auth/verify.
+      return true;
     } catch (e) {
       lastErrorMessage =
           'Не удалось подключиться к серверу ${ApiConfig.baseUrl}: $e';
       return false;
     }
+  }
+
+  static Future<bool> verifyEmail(String email, String code) async {
+    lastErrorMessage = null;
+
+    try {
+      final response = await http.post(
+        ApiConfig.uri('/auth/verify'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({'email': email.trim(), 'code': code.trim()}),
+      );
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body) as Map<String, dynamic>;
+        accessToken = data['accessToken'] as String?;
+        refreshToken = data['refreshToken'] as String?;
+        await _persistTokens();
+        return accessToken != null;
+      }
+
+      lastErrorMessage = _messageFromResponse(
+        response,
+        'Не удалось подтвердить e-mail',
+      );
+    } catch (e) {
+      lastErrorMessage =
+          'Не удалось подключиться к серверу ${ApiConfig.baseUrl}: $e';
+    }
+
+    return false;
   }
 
   static Future<bool> restoreSession() async {
