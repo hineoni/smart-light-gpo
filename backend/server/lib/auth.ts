@@ -31,9 +31,11 @@ export function signRefreshToken(payload: JwtPayload) {
 }
 
 export function verifyAccessToken(token: string) {
-  return jwt.verify(token, accessSecret) as JwtPayload;
+  const payload = jwt.verify(token, accessSecret) as JwtPayload;
+  return { userId: payload.userId, email: payload.email };
 }
 
 export function verifyRefreshToken(token: string) {
-  return jwt.verify(token, refreshSecret) as JwtPayload;
+  const payload = jwt.verify(token, refreshSecret) as JwtPayload;
+  return { userId: payload.userId, email: payload.email };
 }
