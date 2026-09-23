@@ -6,6 +6,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'api_config.dart';
 
 class AuthService {
+  static String? verificationCode;
   static const String _accessTokenKey = 'auth.accessToken';
   static const String _refreshTokenKey = 'auth.refreshToken';
 
@@ -75,6 +76,8 @@ class AuthService {
         return false;
       }
 
+      final data = jsonDecode(response.body) as Map<String, dynamic>;
+      verificationCode = data['verificationCode'] as String?;
       // Вход выполняется только после подтверждения e-mail через /auth/verify.
       return true;
     } catch (e) {

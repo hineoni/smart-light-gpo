@@ -19,6 +19,11 @@ function getSmtpConfig() {
 }
 
 export async function sendVerificationEmail(email: string, code: string) {
+  if (process.env.VERIFICATION_DELIVERY === 'console') {
+    console.log(`[email verification] ${email}: ${code}`);
+    return;
+  }
+
   const config = getSmtpConfig();
   const transporter = nodemailer.createTransport({
     host: config.host,

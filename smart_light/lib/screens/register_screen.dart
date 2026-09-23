@@ -95,7 +95,10 @@ class _RegisterScreenState extends State<RegisterScreen> {
     final verified = await Navigator.push<bool>(
       context,
       MaterialPageRoute(
-        builder: (_) => EmailVerificationScreen(email: _emailCtrl.text.trim()),
+        builder: (_) => EmailVerificationScreen(
+          email: _emailCtrl.text.trim(),
+          verificationCode: AuthService.verificationCode,
+        ),
       ),
     );
 
