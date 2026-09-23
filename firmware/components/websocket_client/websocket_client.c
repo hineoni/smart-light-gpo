@@ -337,7 +337,7 @@ esp_err_t websocket_client_init(const device_config_t* config)
         .keep_alive_idle = 60,         // Keep-alive параметры (исправлено)
         .keep_alive_interval = 5,      // (исправлено)
         .keep_alive_count = 3,         // (исправлено)
-        .network_timeout_ms = 10000,   // Таймауты сети
+        .network_timeout_ms = 30000,   // Дать TLS/WebSocket соединению до 30 секунд
         .user_context = NULL,
         .crt_bundle_attach = is_secure ? esp_crt_bundle_attach : NULL
     };
