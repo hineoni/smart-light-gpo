@@ -17,12 +17,8 @@ class _BleProvisioningScreenState extends State<BleProvisioningScreen> {
   bool isProvisioning = false;
   bool isManualSetup = false;
   String? selectedDevice;
-  final TextEditingController ssidController = TextEditingController(
-    text: '', // Предустановленный SSID
-  );
-  final TextEditingController passwordController = TextEditingController(
-    text: '', // Предустановленный пароль
-  );
+  final TextEditingController ssidController = TextEditingController();
+  final TextEditingController passwordController = TextEditingController();
   final TextEditingController deviceIpController = TextEditingController();
 
   @override
@@ -34,6 +30,9 @@ class _BleProvisioningScreenState extends State<BleProvisioningScreen> {
   @override
   void dispose() {
     BleProvisioningService.cleanup();
+    ssidController.dispose();
+    passwordController.dispose();
+    deviceIpController.dispose();
     super.dispose();
   }
 
