@@ -4,9 +4,14 @@ import '../services/auth_service.dart';
 
 // Добавил окно проверки email
 class EmailVerificationScreen extends StatefulWidget {
-  const EmailVerificationScreen({super.key, required this.email});
+  const EmailVerificationScreen({
+    super.key,
+    required this.email,
+    this.verificationCode,
+  });
 
   final String email;
+  final String? verificationCode;
 
   @override
   State<EmailVerificationScreen> createState() =>
@@ -69,6 +74,14 @@ class _EmailVerificationScreenState extends State<EmailVerificationScreen> {
                       'Введите код, отправленный на ${widget.email}',
                       textAlign: TextAlign.center,
                     ),
+                    if (widget.verificationCode != null) ...[
+                      const SizedBox(height: 12),
+                      SelectableText(
+                        'Код для локального режима: ${widget.verificationCode}',
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(fontWeight: FontWeight.w600),
+                      ),
+                    ],
                     const SizedBox(height: 24),
                     TextFormField(
                       controller: _codeCtrl,

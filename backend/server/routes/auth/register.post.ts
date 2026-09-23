@@ -71,5 +71,8 @@ export default defineEventHandler(async (event) => {
     success: true,
     email: user.email,
     verificationRequired: true,
+    ...(process.env.VERIFICATION_DELIVERY === 'console'
+      ? { verificationCode: code }
+      : {}),
   };
 });
