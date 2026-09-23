@@ -26,6 +26,7 @@
 #define RESET_BUTTON_PIN GPIO_NUM_0  // GPIO0 - кнопка BOOT на большинстве ESP32
 
 static const char *TAG = "SMARTLIGHT_MAIN";
+static const char *DEFAULT_BACKEND_URL = "wss://api.smart-light.tech/_ws";
 
 // Глобальная конфигурация устройства
 static device_config_t g_device_config = {0};
@@ -33,6 +34,25 @@ static device_config_t g_device_config = {0};
 // Флаги состояния
 static bool g_websocket_started = false;
 static TickType_t g_websocket_started_at = 0;
+
+static void apply_backend_url(void)
+{
+    if (strcmp(g_device_config.backend_url, DEFAULT_BACKEND_URL) == 0) {
+        return;
+    }
+
+    ESP_LOGI(TAG, "Updating backend URL to the app server");
+    strncpy(g_device_config.backend_url, DEFAULT_BACKEND_URL, sizeof(g_device_config.backend_url) - 1);
+    if (g_device_config.device_id[0] == '\0') {
+        config_generate_device_id(g_device_config.device_id);
+    }
+    g_device_config.is_valid = g_device_config.wifi_ssid[0] != '\0';
+
+    esp_err_t save_ret = config_storage_save(&g_device_config);
+    if (save_ret != ESP_OK) {
+        ESP_LOGW(TAG, "Failed to save backend URL: %s", esp_err_to_name(save_ret));
+    }
+}
 
 static bool configure_uwb_for_device(uwb_positioning_config_t *uwb_config)
 {
@@ -44,7 +64,8 @@ static bool configure_uwb_for_device(uwb_positioning_config_t *uwb_config)
     uwb_config->pid = 255;
     uwb_config->period = 5;
 
-    if (strstr(g_device_config.device_id, "14335c382ddc") != NULL) {
+    if (strstr(g_device_config.device_id, "14335c382ddc") != NULL ||
+        strstr(g_device_config.device_id, "382ddc") != NULL) {
         uwb_config->role = 1;
         uwb_config->local_address = 0x0000;
         uwb_config->peer0_address = 0x0001;
@@ -53,7 +74,8 @@ static bool configure_uwb_for_device(uwb_positioning_config_t *uwb_config)
         return true;
     }
 
-    if (strstr(g_device_config.device_id, "0483085966e0") != NULL) {
+    if (strstr(g_device_config.device_id, "0483085966e0") != NULL ||
+        strstr(g_device_config.device_id, "5966e0") != NULL) {
         uwb_config->role = 0;
         uwb_config->local_address = 0x0001;
         uwb_config->peer0_address = 0x0000;
@@ -279,6 +301,8 @@ static esp_err_t init_system(void)
         ESP_LOGW(TAG, "No configuration found, will start in AP mode for setup: %s", esp_err_to_name(ret));
         g_device_config.is_valid = false;
     }
+
+    apply_backend_url();
     
     if (g_device_config.is_valid) {
         ESP_LOGI(TAG, "Configuration loaded:");
@@ -319,7 +343,7 @@ static esp_err_t init_system(void)
     ESP_LOGI(TAG, "Initializing LED controller...");
     led_controller_config_t led_config = {
         .gpio_pin = 33,    // GPIO пин для DATA сигнала WS2812
-        .led_count = 7     // Количество светодиодов в ленте
+        .led_count = 64    // Матрица 8x8, 64 адресных светодиода
     };
     ret = led_controller_init(&led_config);
     if (ret != ESP_OK) {

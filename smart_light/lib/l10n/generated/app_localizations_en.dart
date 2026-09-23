@@ -30,10 +30,10 @@ class AppLocalizationsEn extends AppLocalizations {
   String get darkTheme => 'Dark theme';
 
   @override
-  String get emeraldTheme => 'Emerald theme';
+  String get emeraldTheme => 'Green theme';
 
   @override
-  String get indigoTheme => 'Neon indigo theme';
+  String get indigoTheme => 'Blue theme';
 
   @override
   String get language => 'Language';

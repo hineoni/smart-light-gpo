@@ -2,6 +2,7 @@
 #include "driver/ledc.h"
 #include "esp_log.h"
 #include "freertos/FreeRTOS.h"
+#include "freertos/semphr.h"
 #include "freertos/task.h"
 #include <math.h>
 
@@ -19,6 +20,7 @@ static const char *TAG = "SERVO_CONTROLLER";
 #define SERVO_MIN_DUTY                328    // ~0.8ms при 13-bit и 50Hz (минимальный рабочий импульс)
 #define SERVO_MAX_DUTY                1024   // ~2.5ms при 13-bit и 50Hz (максимальный рабочий импульс)  
 #define SERVO_STEP_DELAY_MS           15     // Задержка между шагами плавного движения
+#define SERVO_IDLE_AFTER_MS           1000   // Время для завершения движения перед отключением PWM
 
 // Текущие состояния сервоприводов
 static servo_status_t s_servo_status = {
@@ -32,6 +34,10 @@ static servo_status_t s_servo_status = {
 static int s_target_angle1 = 90;
 static int s_target_angle2 = 90;
 static TickType_t s_last_step_time = 0;
+static TickType_t s_last_output_time[2] = {0};
+static bool s_output_active[2] = {false, false};
+static bool s_timer_paused = false;
+static SemaphoreHandle_t s_servo_mutex = NULL;
 
 /**
  * @brief Преобразование угла в значение duty cycle для LEDC
@@ -57,7 +63,17 @@ static void set_servo_angle_immediate(int servo_id, int angle)
 {
     uint32_t duty = angle_to_duty(angle);
     ledc_channel_t channel = (servo_id == 1) ? SERVO_LEDC_CHANNEL_1 : SERVO_LEDC_CHANNEL_2;
+    int index = servo_id - 1;
     int gpio_pin = (servo_id == 1) ? SERVO1_PIN : SERVO2_PIN;
+
+    if (s_timer_paused) {
+        esp_err_t resume_ret = ledc_timer_resume(SERVO_LEDC_MODE, SERVO_LEDC_TIMER);
+        if (resume_ret != ESP_OK) {
+            ESP_LOGE(TAG, "Failed to wake servo timer: %s", esp_err_to_name(resume_ret));
+            return;
+        }
+        s_timer_paused = false;
+    }
     
     ESP_LOGI(TAG, "Setting servo %d (GPIO%d): angle=%d°, duty=%d (%.2fms)", 
              servo_id, gpio_pin, angle, duty, (duty * 20.0) / 8192.0);
@@ -73,6 +89,8 @@ static void set_servo_angle_immediate(int servo_id, int angle)
         ESP_LOGE(TAG, "Failed to update duty for servo %d: %s", servo_id, esp_err_to_name(ret));
         return;
     }
+    s_output_active[index] = true;
+    s_last_output_time[index] = xTaskGetTickCount();
     
     // Проверяем что duty cycle установлен корректно
     uint32_t actual_duty = ledc_get_duty(SERVO_LEDC_MODE, channel);
@@ -85,6 +103,11 @@ static void set_servo_angle_immediate(int servo_id, int angle)
 esp_err_t servo_controller_init(void)
 {
     esp_err_t ret;
+
+    if (s_servo_mutex == NULL) {
+        s_servo_mutex = xSemaphoreCreateMutex();
+        if (s_servo_mutex == NULL) return ESP_ERR_NO_MEM;
+    }
     
     // Конфигурация таймера LEDC
     ledc_timer_config_t ledc_timer = {
@@ -107,7 +130,7 @@ esp_err_t servo_controller_init(void)
         .timer_sel = SERVO_LEDC_TIMER,
         .intr_type = LEDC_INTR_DISABLE,
         .gpio_num = SERVO1_PIN,
-        .duty = angle_to_duty(90),  // Начальное положение 90 градусов
+        .duty = angle_to_duty(90),  // Начальное положение, как в прежней прошивке
         .hpoint = 0
     };
     ret = ledc_channel_config(&ledc_channel_1);
@@ -123,7 +146,7 @@ esp_err_t servo_controller_init(void)
         .timer_sel = SERVO_LEDC_TIMER,
         .intr_type = LEDC_INTR_DISABLE,
         .gpio_num = SERVO2_PIN,
-        .duty = angle_to_duty(90),  // Начальное положение 90 градусов
+        .duty = angle_to_duty(90),  // Начальное положение, как в прежней прошивке
         .hpoint = 0
     };
     ret = ledc_channel_config(&ledc_channel_2);
@@ -131,6 +154,12 @@ esp_err_t servo_controller_init(void)
         ESP_LOGE(TAG, "Failed to configure LEDC channel 2: %s", esp_err_to_name(ret));
         return ret;
     }
+
+    s_output_active[0] = true;
+    s_output_active[1] = true;
+    s_last_output_time[0] = xTaskGetTickCount();
+    s_last_output_time[1] = s_last_output_time[0];
+    s_timer_paused = false;
     
     s_last_step_time = xTaskGetTickCount();
     
@@ -140,6 +169,13 @@ esp_err_t servo_controller_init(void)
 
 esp_err_t servo_controller_move_to(int servo_id, int angle, bool smooth)
 {
+    if (servo_id != 1 && servo_id != 2) {
+        ESP_LOGE(TAG, "Invalid servo ID: %d", servo_id);
+        return ESP_ERR_INVALID_ARG;
+    }
+    if (s_servo_mutex == NULL) return ESP_ERR_INVALID_STATE;
+    xSemaphoreTake(s_servo_mutex, portMAX_DELAY);
+
     // Ограничиваем угол
     if (angle < SERVO_MIN_ANGLE) angle = SERVO_MIN_ANGLE;
     if (angle > SERVO_MAX_ANGLE) angle = SERVO_MAX_ANGLE;
@@ -162,12 +198,10 @@ esp_err_t servo_controller_move_to(int servo_id, int angle, bool smooth)
             s_servo_status.moving2 = false;
             set_servo_angle_immediate(2, angle);
         }
-    } else {
-        ESP_LOGE(TAG, "Invalid servo ID: %d", servo_id);
-        return ESP_ERR_INVALID_ARG;
     }
     
     ESP_LOGI(TAG, "Servo %d moving to %d degrees (smooth: %s)", servo_id, angle, smooth ? "yes" : "no");
+    xSemaphoreGive(s_servo_mutex);
     return ESP_OK;
 }
 
@@ -176,17 +210,43 @@ esp_err_t servo_controller_get_status(servo_status_t* status)
     if (status == NULL) {
         return ESP_ERR_INVALID_ARG;
     }
-    
+    if (s_servo_mutex == NULL) return ESP_ERR_INVALID_STATE;
+    xSemaphoreTake(s_servo_mutex, portMAX_DELAY);
     *status = s_servo_status;
+    xSemaphoreGive(s_servo_mutex);
     return ESP_OK;
 }
 
 void servo_controller_task(void)
 {
+    if (s_servo_mutex == NULL) return;
+    xSemaphoreTake(s_servo_mutex, portMAX_DELAY);
     TickType_t current_time = xTaskGetTickCount();
+
+    if (s_output_active[0] && !s_servo_status.moving1 &&
+        (current_time - s_last_output_time[0]) >= pdMS_TO_TICKS(SERVO_IDLE_AFTER_MS)) {
+        if (ledc_stop(SERVO_LEDC_MODE, SERVO_LEDC_CHANNEL_1, 0) == ESP_OK) {
+            s_output_active[0] = false;
+            ESP_LOGI(TAG, "Servo 1 PWM stopped after movement");
+        }
+    }
+    if (s_output_active[1] && !s_servo_status.moving2 &&
+        (current_time - s_last_output_time[1]) >= pdMS_TO_TICKS(SERVO_IDLE_AFTER_MS)) {
+        if (ledc_stop(SERVO_LEDC_MODE, SERVO_LEDC_CHANNEL_2, 0) == ESP_OK) {
+            s_output_active[1] = false;
+            ESP_LOGI(TAG, "Servo 2 PWM stopped after movement");
+        }
+    }
+    if (!s_timer_paused && !s_output_active[0] && !s_output_active[1] &&
+        !s_servo_status.moving1 && !s_servo_status.moving2 &&
+        ledc_timer_pause(SERVO_LEDC_MODE, SERVO_LEDC_TIMER) == ESP_OK) {
+        s_timer_paused = true;
+        ESP_LOGI(TAG, "Servo PWM timer paused");
+    }
     
     // Проверяем, прошло ли достаточно времени с последнего шага
     if ((current_time - s_last_step_time) < pdMS_TO_TICKS(SERVO_STEP_DELAY_MS)) {
+        xSemaphoreGive(s_servo_mutex);
         return;
     }
     
@@ -223,13 +283,23 @@ void servo_controller_task(void)
             s_servo_status.moving2 = false;
         }
     }
+    xSemaphoreGive(s_servo_mutex);
 }
 
 void servo_controller_deinit(void)
 {
+    if (s_servo_mutex == NULL) return;
+    xSemaphoreTake(s_servo_mutex, portMAX_DELAY);
     // Остановка каналов LEDC
     ledc_stop(SERVO_LEDC_MODE, SERVO_LEDC_CHANNEL_1, 0);
     ledc_stop(SERVO_LEDC_MODE, SERVO_LEDC_CHANNEL_2, 0);
+    ledc_timer_pause(SERVO_LEDC_MODE, SERVO_LEDC_TIMER);
+    s_output_active[0] = false;
+    s_output_active[1] = false;
+    s_timer_paused = true;
+    s_servo_status.moving1 = false;
+    s_servo_status.moving2 = false;
+    xSemaphoreGive(s_servo_mutex);
     
     ESP_LOGI(TAG, "Servo controller deinitialized");
 }
@@ -267,7 +337,7 @@ esp_err_t servo_controller_test(int servo_id)
         
         for (int j = 0; j < num_angles; j++) {
             ESP_LOGI(TAG, "Servo %d -> %d degrees", servo, test_angles[j]);
-            set_servo_angle_immediate(servo, test_angles[j]);
+            servo_controller_move_to(servo, test_angles[j], false);
             vTaskDelay(pdMS_TO_TICKS(1000)); // 1 секунда на позицию
         }
         

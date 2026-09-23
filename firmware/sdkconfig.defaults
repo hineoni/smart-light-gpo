@@ -1,5 +1,8 @@
 # ESP-IDF project configuration
 
+# Keep BLE, Wi-Fi and the full application within ESP32 IRAM limits.
+CONFIG_COMPILER_OPTIMIZATION_SIZE=y
+
 # Partition Table
 CONFIG_PARTITION_TABLE_CUSTOM=y
 CONFIG_PARTITION_TABLE_CUSTOM_FILENAME="partitions.csv"

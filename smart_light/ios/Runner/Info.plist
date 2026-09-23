@@ -32,7 +32,7 @@
 		<true/>
 		<key>NSExceptionDomains</key>
 		<dict>
-			<key>192.168.0.105</key>
+			<key>192.168.0.104</key>
 			<dict>
 				<key>NSExceptionAllowsInsecureHTTPLoads</key>
 				<true/>
@@ -48,6 +48,8 @@
 	<string>This app needs Bluetooth to setup SmartLight devices</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>This app needs location access to scan for Bluetooth devices</string>
+	<key>NSLocalNetworkUsageDescription</key>
+	<string>This app needs local network access to connect to the Smart Light backend and devices.</string>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
 	<key>UILaunchStoryboardName</key>

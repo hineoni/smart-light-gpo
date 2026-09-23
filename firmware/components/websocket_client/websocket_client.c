@@ -4,6 +4,7 @@
 #include "uwb_positioning.h"
 #include "cJSON.h"
 #include "esp_log.h"
+#include "esp_crt_bundle.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include <string.h>
@@ -338,7 +339,7 @@ esp_err_t websocket_client_init(const device_config_t* config)
         .keep_alive_count = 3,         // (исправлено)
         .network_timeout_ms = 10000,   // Таймауты сети
         .user_context = NULL,
-        .cert_pem = NULL
+        .crt_bundle_attach = is_secure ? esp_crt_bundle_attach : NULL
     };
     
     s_websocket_client = esp_websocket_client_init(&websocket_cfg);

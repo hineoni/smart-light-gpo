@@ -12,81 +12,81 @@ class SettingsScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final l10n = AppLocalizations.of(context)!;
-    final isRussian = settings.locale.languageCode == 'ru';
-
-    return Scaffold(
-      appBar: AppBar(title: Text(l10n.settings)),
-      body: ListView(
-        padding: const EdgeInsets.symmetric(vertical: 12),
-        children: [
-          _SectionTitle(l10n.appearance),
-          ListTile(
-            leading: Icon(
-              settings.theme == AppTheme.emerald
-                  ? Icons.eco_outlined
-                  : settings.theme == AppTheme.indigo
-                  ? Icons.bolt_outlined
-                  : settings.theme == AppTheme.light
-                  ? Icons.light_mode
-                  : Icons.dark_mode,
-            ),
-            title: Text(l10n.appearance),
-            trailing: DropdownButton<AppTheme>(
-              value: settings.theme,
-              onChanged: (theme) {
-                if (theme != null) settings.setTheme(theme);
-              },
-              items: [
-                DropdownMenuItem(
-                  value: AppTheme.dark,
-                  child: Text(l10n.darkTheme),
+    return ListenableBuilder(
+      listenable: settings,
+      builder: (context, _) {
+        final l10n = AppLocalizations.of(context)!;
+        final isRussian = settings.locale.languageCode == 'ru';
+        return Scaffold(
+          appBar: AppBar(title: Text(l10n.settings)),
+          body: ListView(
+            padding: const EdgeInsets.symmetric(vertical: 12),
+            children: [
+              _SectionTitle(l10n.appearance),
+              ListTile(
+                leading: Icon(
+                  settings.theme == AppTheme.emerald
+                      ? Icons.eco_outlined
+                      : settings.theme == AppTheme.indigo
+                      ? Icons.bolt_outlined
+                      : settings.theme == AppTheme.light
+                      ? Icons.light_mode
+                      : Icons.dark_mode,
                 ),
-                DropdownMenuItem(
-                  value: AppTheme.light,
-                  child: Text(l10n.lightTheme),
+                title: Text(l10n.appearance),
+                trailing: DropdownButton<AppTheme>(
+                  value: settings.theme,
+                  onChanged: (theme) {
+                    if (theme != null) settings.setTheme(theme);
+                  },
+                  items: [
+                    for (final theme in AppTheme.values)
+                      DropdownMenuItem(
+                        value: theme,
+                        child: Text(_themeLabel(l10n, theme)),
+                      ),
+                  ],
                 ),
-                DropdownMenuItem(
-                  value: AppTheme.emerald,
-                  child: Text(l10n.emeraldTheme),
+              ),
+              const Divider(),
+              _SectionTitle(l10n.language),
+              ListTile(
+                leading: const Icon(Icons.language),
+                title: Text(l10n.language),
+                trailing: DropdownButton<String>(
+                  value: isRussian ? 'ru' : 'en',
+                  onChanged: (languageCode) {
+                    if (languageCode != null) {
+                      settings.setLocale(Locale(languageCode));
+                    }
+                  },
+                  items: [
+                    DropdownMenuItem(value: 'ru', child: Text(l10n.russian)),
+                    DropdownMenuItem(value: 'en', child: Text(l10n.english)),
+                  ],
                 ),
-                DropdownMenuItem(
-                  value: AppTheme.indigo,
-                  child: Text(l10n.indigoTheme),
-                ),
-              ],
-            ),
+              ),
+              const Divider(),
+              _SectionTitle(l10n.account),
+              ListTile(
+                leading: const Icon(Icons.logout),
+                title: Text(l10n.signOut),
+                subtitle: Text(l10n.signOutDescription),
+                onTap: () => _confirmSignOut(context, l10n),
+              ),
+            ],
           ),
-          const Divider(),
-          _SectionTitle(l10n.language),
-          ListTile(
-            leading: const Icon(Icons.language),
-            title: Text(l10n.language),
-            trailing: DropdownButton<String>(
-              value: isRussian ? 'ru' : 'en',
-              onChanged: (languageCode) {
-                if (languageCode != null) {
-                  settings.setLocale(Locale(languageCode));
-                }
-              },
-              items: [
-                DropdownMenuItem(value: 'ru', child: Text(l10n.russian)),
-                DropdownMenuItem(value: 'en', child: Text(l10n.english)),
-              ],
-            ),
-          ),
-          const Divider(),
-          _SectionTitle(l10n.account),
-          ListTile(
-            leading: const Icon(Icons.logout),
-            title: Text(l10n.signOut),
-            subtitle: Text(l10n.signOutDescription),
-            onTap: () => _confirmSignOut(context, l10n),
-          ),
-        ],
-      ),
+        );
+      },
     );
   }
+
+  String _themeLabel(AppLocalizations l10n, AppTheme theme) => switch (theme) {
+    AppTheme.dark => l10n.darkTheme,
+    AppTheme.light => l10n.lightTheme,
+    AppTheme.emerald => l10n.emeraldTheme,
+    AppTheme.indigo => l10n.indigoTheme,
+  };
 
   Future<void> _confirmSignOut(
     BuildContext context,

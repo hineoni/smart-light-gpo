@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../l10n/generated/app_localizations.dart';
 import '../services/app_settings.dart';
 import '../services/auth_service.dart';
+import 'email_verification_screen.dart';
 
 class RegisterScreen extends StatefulWidget {
   const RegisterScreen({super.key});
@@ -91,6 +92,18 @@ class _RegisterScreenState extends State<RegisterScreen> {
       return;
     }
 
+    final verified = await Navigator.push<bool>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => EmailVerificationScreen(
+          email: _emailCtrl.text.trim(),
+          verificationCode: AuthService.verificationCode,
+        ),
+      ),
+    );
+
+    if (!mounted || verified != true) return;
+
     Navigator.pop(context, true);
   }
 
@@ -99,10 +112,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
     final l10n = AppLocalizations.of(context)!;
     return Scaffold(
       appBar: AppBar(
-        actions: [
-          const _ThemeToggleButton(),
-          _RegisterLanguageMenu(),
-        ],
+        actions: [const _ThemeToggleButton(), _RegisterLanguageMenu()],
       ),
       body: SafeArea(
         child: Center(

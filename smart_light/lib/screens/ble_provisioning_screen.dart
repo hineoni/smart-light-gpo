@@ -23,9 +23,6 @@ class _BleProvisioningScreenState extends State<BleProvisioningScreen> {
   final TextEditingController passwordController = TextEditingController(
     text: '', // Предустановленный пароль
   );
-  final TextEditingController backendUrlController = TextEditingController(
-    text: ApiConfig.deviceProvisioningBackendUrl,
-  );
   final TextEditingController deviceIpController = TextEditingController();
 
   @override
@@ -115,7 +112,7 @@ class _BleProvisioningScreenState extends State<BleProvisioningScreen> {
       print('Starting full provisioning with:');
       print('  Device: ${selectedDevice!}');
       print('  SSID: ${ssidController.text}');
-      print('  Backend URL: ${backendUrlController.text}');
+      print('  Backend URL: ${ApiConfig.deviceProvisioningBackendUrl}');
 
       final success =
           await BleProvisioningService.provisionDeviceWithCustomData(
@@ -123,7 +120,7 @@ class _BleProvisioningScreenState extends State<BleProvisioningScreen> {
             proofOfPossession: 'abcd1234',
             ssid: ssidController.text,
             password: passwordController.text,
-            wsUrl: backendUrlController.text,
+            wsUrl: ApiConfig.deviceProvisioningBackendUrl,
             deviceId: '', // ESP32 сам определит свой ID
           );
 
@@ -203,7 +200,7 @@ class _BleProvisioningScreenState extends State<BleProvisioningScreen> {
     try {
       final success = await BleProvisioningService.setupBackendUrlManually(
         deviceIpController.text,
-        backendUrlController.text,
+        ApiConfig.deviceProvisioningBackendUrl,
       );
 
       if (mounted) {
@@ -348,15 +345,6 @@ class _BleProvisioningScreenState extends State<BleProvisioningScreen> {
                           border: OutlineInputBorder(),
                         ),
                         obscureText: true,
-                      ),
-                      const SizedBox(height: 12),
-                      TextField(
-                        controller: backendUrlController,
-                        decoration: const InputDecoration(
-                          labelText: 'Backend URL',
-                          prefixIcon: Icon(Icons.cloud),
-                          border: OutlineInputBorder(),
-                        ),
                       ),
                       const SizedBox(height: 20),
                       SizedBox(
