@@ -7,6 +7,7 @@ const publicPrefixes = [
   '/auth/login',
   '/auth/refresh',
   '/auth/verify',
+  '/auth/password-reset/',
   '/health',
   '/_openapi.json',
   '/_scalar',

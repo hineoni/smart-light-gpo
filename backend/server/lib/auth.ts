@@ -8,11 +8,14 @@ const accessExpires = (process.env.JWT_ACCESS_EXPIRES ||
   '15m') as SignOptions['expiresIn'];
 const refreshExpires = (process.env.JWT_REFRESH_EXPIRES ||
   '30d') as SignOptions['expiresIn'];
+const passwordResetExpires = '10m' as SignOptions['expiresIn'];
 
 export type JwtPayload = {
   userId: string;
   email: string;
 };
+
+type PasswordResetPayload = JwtPayload & { purpose: 'password_reset' };
 
 export function hashPassword(password: string) {
   return bcrypt.hash(password, 10);
@@ -28,6 +31,22 @@ export function signAccessToken(payload: JwtPayload) {
 
 export function signRefreshToken(payload: JwtPayload) {
   return jwt.sign(payload, refreshSecret, { expiresIn: refreshExpires });
+}
+
+export function signPasswordResetToken(payload: JwtPayload) {
+  return jwt.sign(
+    { ...payload, purpose: 'password_reset' } satisfies PasswordResetPayload,
+    accessSecret,
+    { expiresIn: passwordResetExpires },
+  );
+}
+
+export function verifyPasswordResetToken(token: string) {
+  const payload = jwt.verify(token, accessSecret) as Partial<PasswordResetPayload>;
+  if (payload.purpose !== 'password_reset' || !payload.userId || !payload.email) {
+    throw new Error('Invalid password reset token');
+  }
+  return { userId: payload.userId, email: payload.email };
 }
 
 export function verifyAccessToken(token: string) {

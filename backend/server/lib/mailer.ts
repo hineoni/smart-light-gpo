@@ -42,3 +42,28 @@ export async function sendVerificationEmail(email: string, code: string) {
     text: `Ваш код подтверждения: ${code}. Он действует 10 минут.`,
   });
 }
+
+export async function sendPasswordResetEmail(email: string, code: string) {
+  if (process.env.VERIFICATION_DELIVERY === 'console') {
+    console.log(`[password reset] ${email}: ${code}`);
+    return;
+  }
+
+  const config = getSmtpConfig();
+  const transporter = nodemailer.createTransport({
+    host: config.host,
+    port: config.port,
+    secure: config.port === 465,
+    auth: {
+      user: config.user,
+      pass: config.pass,
+    },
+  });
+
+  await transporter.sendMail({
+    from: config.from,
+    to: email,
+    subject: 'Восстановление пароля — Smart Light',
+    text: `Ваш код для восстановления пароля: ${code}. Он действует 10 минут.`,
+  });
+}
