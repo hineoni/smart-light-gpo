@@ -42,6 +42,7 @@ export async function sendVerificationEmail(email: string, code: string) {
     text: `Ваш код подтверждения: ${code}. Он действует 10 минут.`,
   });
 }
+<<<<<<< HEAD
 
 export async function sendPasswordResetEmail(email: string, code: string) {
   if (process.env.VERIFICATION_DELIVERY === 'console') {
@@ -67,3 +68,5 @@ export async function sendPasswordResetEmail(email: string, code: string) {
     text: `Ваш код для восстановления пароля: ${code}. Он действует 10 минут.`,
   });
 }
+=======
+>>>>>>> origin/web2

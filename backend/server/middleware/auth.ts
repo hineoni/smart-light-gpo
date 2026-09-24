@@ -7,7 +7,10 @@ const publicPrefixes = [
   '/auth/login',
   '/auth/refresh',
   '/auth/verify',
+<<<<<<< HEAD
   '/auth/password-reset/',
+=======
+>>>>>>> origin/web2
   '/health',
   '/_openapi.json',
   '/_scalar',

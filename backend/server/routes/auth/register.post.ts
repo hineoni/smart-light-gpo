@@ -16,6 +16,7 @@ const schema = z.object({
 
 export default defineEventHandler(async (event) => {
   const data = schema.parse(await readBody(event));
+<<<<<<< HEAD
   const email = data.email.trim().toLowerCase();
 
   const existingUser = await prisma.user.findUnique({
@@ -32,6 +33,23 @@ export default defineEventHandler(async (event) => {
   const user = await prisma.user.create({
       data: {
         email,
+=======
+
+  const existingUser = await prisma.user.findUnique({
+    where: { email: data.email },
+  });
+
+  if (existingUser?.emailVerifiedAt) {
+    throw createError({
+      statusCode: 409,
+      statusMessage: 'User already exists',
+    });
+  }
+
+  const user = existingUser ?? await prisma.user.create({
+      data: {
+        email: data.email,
+>>>>>>> origin/web2
         passwordHash: await hashPassword(data.password),
         name: data.name,
       },

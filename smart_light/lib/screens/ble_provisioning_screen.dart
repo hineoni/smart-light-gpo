@@ -18,10 +18,17 @@ class _BleProvisioningScreenState extends State<BleProvisioningScreen> {
   bool isManualSetup = false;
   String? selectedDevice;
   final TextEditingController ssidController = TextEditingController(
+<<<<<<< HEAD
     text: 'fbq', // Предустановленный SSID
   );
   final TextEditingController passwordController = TextEditingController(
     text: '24351058', // Предустановленный пароль
+=======
+    text: '', // Предустановленный SSID
+  );
+  final TextEditingController passwordController = TextEditingController(
+    text: '', // Предустановленный пароль
+>>>>>>> origin/web2
   );
   final TextEditingController backendUrlController = TextEditingController(
     text: ApiConfig.deviceProvisioningBackendUrl,

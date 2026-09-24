@@ -4,7 +4,10 @@ import '../l10n/generated/app_localizations.dart';
 import '../services/app_settings.dart';
 import '../services/auth_service.dart';
 import 'main_navigation_screen.dart';
+<<<<<<< HEAD
 import 'password_reset_screen.dart';
+=======
+>>>>>>> origin/web2
 import 'register_screen.dart';
 
 class LoginScreen extends StatefulWidget {
@@ -172,6 +175,7 @@ class _LoginScreenState extends State<LoginScreen> {
                         onPressed: _loading ? null : _openRegister,
                         child: Text(l10n.noAccountRegister),
                       ),
+<<<<<<< HEAD
                       TextButton(
                         onPressed: _loading
                             ? null
@@ -185,6 +189,8 @@ class _LoginScreenState extends State<LoginScreen> {
                               },
                         child: const Text('Забыли пароль?'),
                       ),
+=======
+>>>>>>> origin/web2
                     ],
                   ),
                 ),

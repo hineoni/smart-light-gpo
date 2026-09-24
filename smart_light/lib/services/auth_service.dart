@@ -7,7 +7,10 @@ import 'api_config.dart';
 
 class AuthService {
   static String? verificationCode;
+<<<<<<< HEAD
   static String? passwordResetVerificationCode;
+=======
+>>>>>>> origin/web2
   static const String _accessTokenKey = 'auth.accessToken';
   static const String _refreshTokenKey = 'auth.refreshToken';
 
@@ -72,7 +75,11 @@ class AuthService {
 
       if (response.statusCode != 200 && response.statusCode != 201) {
         lastErrorMessage = response.statusCode == 409
+<<<<<<< HEAD
             ? 'Данный почтовый адрес уже используется'
+=======
+            ? 'Пользователь с таким email уже существует'
+>>>>>>> origin/web2
             : _messageFromResponse(response, 'Не удалось зарегистрироваться');
         return false;
       }
@@ -118,6 +125,7 @@ class AuthService {
     return false;
   }
 
+<<<<<<< HEAD
   static Future<bool> requestPasswordReset(String email) async {
     lastErrorMessage = null;
 
@@ -200,6 +208,8 @@ class AuthService {
     return false;
   }
 
+=======
+>>>>>>> origin/web2
   static Future<bool> restoreSession() async {
     final prefs = await SharedPreferences.getInstance();
     accessToken = prefs.getString(_accessTokenKey);

@@ -14,10 +14,16 @@ const schema = z.object({
 
 export default defineEventHandler(async (event) => {
   const data = schema.parse(await readBody(event));
+<<<<<<< HEAD
   const email = data.email.trim().toLowerCase();
 
   const user = await prisma.user.findUnique({
     where: { email },
+=======
+
+  const user = await prisma.user.findUnique({
+    where: { email: data.email },
+>>>>>>> origin/web2
   });
 
   if (!user || !(await verifyPassword(data.password, user.passwordHash))) {
