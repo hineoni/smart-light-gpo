@@ -1,8 +1,5 @@
 class ApiConfig {
-  static const String baseUrl = String.fromEnvironment(
-    'API_BASE_URL',
-    defaultValue: 'https://api.smart-light.tech',
-  );
+  static const String baseUrl = 'https://api.smart-light.tech';
 
   static Uri uri(String path) => Uri.parse('$baseUrl$path');
 
