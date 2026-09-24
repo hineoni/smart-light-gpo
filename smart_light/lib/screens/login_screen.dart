@@ -4,6 +4,7 @@ import '../l10n/generated/app_localizations.dart';
 import '../services/app_settings.dart';
 import '../services/auth_service.dart';
 import 'main_navigation_screen.dart';
+import 'password_reset_screen.dart';
 import 'register_screen.dart';
 
 class LoginScreen extends StatefulWidget {
@@ -170,6 +171,19 @@ class _LoginScreenState extends State<LoginScreen> {
                       TextButton(
                         onPressed: _loading ? null : _openRegister,
                         child: Text(l10n.noAccountRegister),
+                      ),
+                      TextButton(
+                        onPressed: _loading
+                            ? null
+                            : () {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (_) => const PasswordResetScreen(),
+                                  ),
+                                );
+                              },
+                        child: const Text('Забыли пароль?'),
                       ),
                     ],
                   ),
