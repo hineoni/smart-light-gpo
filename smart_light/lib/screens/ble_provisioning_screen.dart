@@ -308,6 +308,7 @@ class _BleProvisioningScreenState extends State<BleProvisioningScreen> {
                       const SizedBox(height: 16),
                       TextField(
                         controller: ssidController,
+                        onChanged: (_) => setState(() {}),
                         decoration: const InputDecoration(
                           labelText: 'Wi-Fi SSID',
                           prefixIcon: Icon(Icons.wifi),
