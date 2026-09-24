@@ -26,6 +26,8 @@
 	<string>$(PRODUCT_COPYRIGHT)</string>
 	<key>NSMainNibFile</key>
 	<string>MainMenu</string>
+	<key>NSBluetoothAlwaysUsageDescription</key>
+	<string>Bluetooth is used to find and set up Smart Light devices.</string>
 	<key>NSPrincipalClass</key>
 	<string>NSApplication</string>
 </dict>

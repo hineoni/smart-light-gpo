@@ -1,4 +1,3 @@
-import 'dart:async';
 import 'package:flutter/material.dart';
 import '../l10n/generated/app_localizations.dart';
 import '../services/api_config.dart';
@@ -52,42 +51,22 @@ class _BleProvisioningScreenState extends State<BleProvisioningScreen> {
   }
 
   Future<void> _startScan() async {
+    if (isScanning) return;
     setState(() {
       isScanning = true;
       devices.clear(); // Очищаем список перед новым сканированием
     });
 
     try {
-      // Используем StreamController для реального времени
-      Timer.periodic(const Duration(milliseconds: 500), (timer) async {
-        if (!isScanning) {
-          timer.cancel();
-          return;
-        }
-
-        final deviceList = await BleProvisioningService.scanDevices(
-          timeout: const Duration(seconds: 2), // Короткие сканы
-        );
-
-        if (mounted) {
-          setState(() {
-            // Добавляем только новые устройства
-            for (final device in deviceList) {
-              if (!devices.contains(device)) {
-                devices.add(device);
-                print('Real-time device added: $device');
-              }
-            }
-          });
-        }
-      });
-
-      // Останавливаем сканирование через 15 секунд
-      Timer(const Duration(seconds: 15), () {
-        if (mounted) {
-          setState(() => isScanning = false);
-        }
-      });
+      final deviceList = await BleProvisioningService.scanDevices(
+        timeout: const Duration(seconds: 15),
+      );
+      if (mounted) {
+        setState(() {
+          devices = deviceList;
+          isScanning = false;
+        });
+      }
     } catch (e) {
       if (mounted) {
         setState(() => isScanning = false);

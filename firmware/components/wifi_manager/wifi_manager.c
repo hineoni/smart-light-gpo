@@ -19,7 +19,7 @@ static esp_netif_t* s_netif_sta = NULL;
 static esp_netif_t* s_netif_ap = NULL;
 static wifi_state_t s_wifi_state = WIFI_STATE_IDLE;
 static int s_retry_num = 0;
-static const int WIFI_MAXIMUM_RETRY = 5;
+static const int WIFI_MAXIMUM_RETRY = 30;
 static bool s_ble_prov_active = false;
 
 static const char* wifi_disconnect_reason_name(uint8_t reason)

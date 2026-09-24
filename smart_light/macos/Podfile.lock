@@ -1,4 +1,6 @@
 PODS:
+  - ESPProvisionMac (3.0.3):
+    - SwiftProtobuf (~> 1.22.0)
   - flutter_blue_plus_darwin (0.0.2):
     - Flutter
     - FlutterMacOS
@@ -6,13 +8,21 @@ PODS:
   - shared_preferences_foundation (0.0.1):
     - Flutter
     - FlutterMacOS
+  - SwiftProtobuf (1.22.1)
 
 DEPENDENCIES:
+  - ESPProvisionMac (from `ESPProvisionMac`)
   - flutter_blue_plus_darwin (from `Flutter/ephemeral/.symlinks/plugins/flutter_blue_plus_darwin/darwin`)
   - FlutterMacOS (from `Flutter/ephemeral`)
   - shared_preferences_foundation (from `Flutter/ephemeral/.symlinks/plugins/shared_preferences_foundation/darwin`)
 
+SPEC REPOS:
+  trunk:
+    - SwiftProtobuf
+
 EXTERNAL SOURCES:
+  ESPProvisionMac:
+    :path: ESPProvisionMac
   flutter_blue_plus_darwin:
     :path: Flutter/ephemeral/.symlinks/plugins/flutter_blue_plus_darwin/darwin
   FlutterMacOS:
@@ -21,10 +31,12 @@ EXTERNAL SOURCES:
     :path: Flutter/ephemeral/.symlinks/plugins/shared_preferences_foundation/darwin
 
 SPEC CHECKSUMS:
+  ESPProvisionMac: 016c13b3dc2fe2245cf84283a88727226c740b0b
   flutter_blue_plus_darwin: 20a08bfeaa0f7804d524858d3d8744bcc1b6dbc3
   FlutterMacOS: d0db08ddef1a9af05a5ec4b724367152bb0500b1
   shared_preferences_foundation: 7036424c3d8ec98dfe75ff1667cb0cd531ec82bb
+  SwiftProtobuf: 7773c4e96a99d7b8ab7cda0fc30a883732ff93b1
 
-PODFILE CHECKSUM: 54d867c82ac51cbd61b565781b9fada492027009
+PODFILE CHECKSUM: edc93f86ffd99a58cc4ad107cc88f615a13a337d
 
 COCOAPODS: 1.16.2

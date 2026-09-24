@@ -10,7 +10,7 @@
 #include <string.h>
 #include <stdio.h>
 
-#define WS_HEARTBEAT_INTERVAL_MS 1000
+#define WS_HEARTBEAT_INTERVAL_MS 10000
 
 static const char *TAG = "WS_CLIENT";
 

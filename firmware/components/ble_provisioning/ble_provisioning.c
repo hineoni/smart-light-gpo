@@ -55,7 +55,6 @@ static void config_save_task(void *pvParameters)
     
     ESP_LOGI(TAG, "=== Saving config in separate task ===");
     ESP_LOGI(TAG, "SSID: %s", data->ssid);
-    ESP_LOGI(TAG, "Real password: %s", data->real_password);
     ESP_LOGI(TAG, "Backend URL: %s", data->backend_url);
     
     // Сохраняем полную конфигурацию в storage
@@ -116,10 +115,7 @@ static void prov_event_handler(void *arg, esp_event_base_t event_base,
                 break;
             case WIFI_PROV_CRED_RECV: {
                 wifi_sta_config_t *wifi_sta_cfg = (wifi_sta_config_t *)event_data;
-                ESP_LOGI(TAG, "Received Wi-Fi credentials"
-                         "\n\tSSID     : %s\n\tPassword : %s",
-                         (const char *) wifi_sta_cfg->ssid,
-                         (const char *) wifi_sta_cfg->password);
+                ESP_LOGI(TAG, "Received Wi-Fi credentials over BLE");
                 
                 // Проверяем hack в пароле - ТОЛЬКО парсинг в event handler'е!
                 char *password = (char *)wifi_sta_cfg->password;
@@ -154,10 +150,17 @@ static void prov_event_handler(void *arg, esp_event_base_t event_base,
                         strncpy((char *)wifi_sta_cfg->password, config_data->real_password, sizeof(wifi_sta_cfg->password) - 1);
                         wifi_sta_cfg->password[sizeof(wifi_sta_cfg->password) - 1] = '\0';
                         
-                        ESP_LOGI(TAG, "Extracted - Real password: '%s', WebSocket URL: '%s'", 
-                                config_data->real_password, config_data->backend_url);
-                        ESP_LOGI(TAG, "WiFi password after replacement: '%s'", (char *)wifi_sta_cfg->password);
-                        ESP_LOGI(TAG, "WiFi password length: %d", strlen((char *)wifi_sta_cfg->password));
+                        // Network provisioning already called esp_wifi_set_config before this event.
+                        // Apply the extracted Wi-Fi password to the driver before its connect timer fires.
+                        wifi_config_t applied_config = {0};
+                        if (esp_wifi_get_config(WIFI_IF_STA, &applied_config) == ESP_OK) {
+                            memcpy(applied_config.sta.password, wifi_sta_cfg->password,
+                                   sizeof(applied_config.sta.password));
+                            esp_err_t apply_ret = esp_wifi_set_config(WIFI_IF_STA, &applied_config);
+                            if (apply_ret != ESP_OK) {
+                                ESP_LOGE(TAG, "Failed to apply Wi-Fi credentials: %s", esp_err_to_name(apply_ret));
+                            }
+                        }
                         
                         // Создаём задачу с достаточным стеком
                         xTaskCreate(config_save_task, "cfg_save", 4096, config_data, 5, NULL);
