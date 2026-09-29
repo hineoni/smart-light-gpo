@@ -5,16 +5,20 @@ import 'package:flutter/foundation.dart' show defaultTargetPlatform, kIsWeb, Tar
 import 'package:flutter_esp_ble_prov/flutter_esp_ble_prov.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:http/http.dart' as http;
-import 'package:flutter_blue_plus/flutter_blue_plus.dart';
+import 'package:flutter_blue_plus_windows/flutter_blue_plus_windows.dart';
 
 class BleProvisioningService {
   static const String devicePrefix = 'SmartLight_';
   static const String proofOfPossession = 'abcd1234';
   static const MethodChannel _macBleChannel = MethodChannel('smart_light/macos_ble_provisioning');
+  static final Map<String, BluetoothDevice> _lastScanDevices = {};
 
   static Future<bool> requestPermissions() async {
-    if (!kIsWeb && defaultTargetPlatform == TargetPlatform.macOS) {
-      // CoreBluetooth requests macOS permission when scanning starts.
+    if (!kIsWeb &&
+        (defaultTargetPlatform == TargetPlatform.macOS ||
+            defaultTargetPlatform == TargetPlatform.windows)) {
+      // macOS prompts through CoreBluetooth; Windows BLE has no runtime
+      // permission flow exposed through permission_handler.
       return true;
     }
     final bluetooth = await Permission.bluetooth.request();
@@ -34,17 +38,29 @@ class BleProvisioningService {
     try {
       // Проверяем Bluetooth
       if (await FlutterBluePlus.isSupported == false) {
-        print("Bluetooth not supported by this device");
-        return [];
+        throw UnsupportedError('Bluetooth is not supported on this device.');
       }
 
       // Ждем когда Bluetooth включится
-      await FlutterBluePlus.adapterState.where((val) => val == BluetoothAdapterState.on).first;
+      // Avoid leaving the UI in a permanent scanning state if Bluetooth is
+      // disabled or macOS has not granted Bluetooth access.
+      final adapterState = await FlutterBluePlus.adapterState
+          .where((state) => state == BluetoothAdapterState.on)
+          .first
+          .timeout(
+            const Duration(seconds: 10),
+            onTimeout: () => throw TimeoutException(
+              'Bluetooth did not become available. Turn on Bluetooth and make sure the computer has a BLE adapter.',
+            ),
+          );
+      print('Bluetooth adapter is ready: $adapterState');
       
       List<String> foundDevices = [];
+      _lastScanDevices.clear();
       
       // Слушаем результаты сканирования (правильный способ по документации)
-      var subscription = FlutterBluePlus.onScanResults.listen((results) {
+      var subscription = FlutterBluePlus.scanResults.listen((results) {
+        if (!FlutterBluePlus.isScanningNow) return;
         if (results.isNotEmpty) {
           for (ScanResult result in results) {
             final name = result.advertisementData.advName.isNotEmpty
@@ -52,6 +68,7 @@ class BleProvisioningService {
                 : result.device.platformName;
             if (name.startsWith(devicePrefix) && !foundDevices.contains(name)) {
               foundDevices.add(name);
+              _lastScanDevices[name] = result.device;
               print('Found device: $name');
             }
           }
@@ -74,7 +91,7 @@ class BleProvisioningService {
       try {
         await FlutterBluePlus.stopScan();
       } catch (_) {}
-      return [];
+      rethrow;
     }
   }
 
@@ -498,12 +515,7 @@ class BleProvisioningService {
       
       if (foundNames.contains(deviceName)) {
         // Получаем последние результаты сканирования
-        final scanResults = FlutterBluePlus.lastScanResults;
-        for (ScanResult result in scanResults) {
-          if (result.device.localName == deviceName) {
-            return result.device;
-          }
-        }
+        return _lastScanDevices[deviceName];
       }
       
       return null;

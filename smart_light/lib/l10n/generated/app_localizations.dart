@@ -601,6 +601,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Provision device'**
   String get provisionDevice;
+
+  /// No description provided for @webBleUnavailable.
+  ///
+  /// In en, this message translates to:
+  /// **'Initial ESP32 setup over Bluetooth is not available in the browser yet. Use the mobile or desktop app to add a device. You can manage already added devices here.'**
+  String get webBleUnavailable;
 }
 
 class _AppLocalizationsDelegate

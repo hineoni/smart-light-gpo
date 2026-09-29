@@ -82,5 +82,6 @@
   "wifiPassword": "Wi-Fi password",
   "selectDeviceFirst": "Select a device first",
   "provisioning": "Provisioning…",
-  "provisionDevice": "Provision device"
+  "provisionDevice": "Provision device",
+  "webBleUnavailable": "Initial ESP32 setup over Bluetooth is not available in the browser yet. Use the mobile or desktop app to add a device. You can manage already added devices here."
 }

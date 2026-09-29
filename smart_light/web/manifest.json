@@ -1,12 +1,11 @@
 {
-    "name": "smart_light",
-    "short_name": "smart_light",
+    "name": "Smart Light Control",
+    "short_name": "Smart Light",
     "start_url": ".",
     "display": "standalone",
-    "background_color": "#0175C2",
-    "theme_color": "#0175C2",
-    "description": "A new Flutter project.",
-    "orientation": "portrait-primary",
+    "background_color": "#1C1B1F",
+    "theme_color": "#1C1B1F",
+    "description": "Manage Smart Light devices, scenes, and positioning.",
     "prefer_related_applications": false,
     "icons": [
         {

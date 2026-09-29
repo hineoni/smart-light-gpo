@@ -1,4 +1,4 @@
-# Smart Light Mobile
+# Smart Light Control
 
 Flutter-приложение для управления устройствами Smart Light.
 
@@ -28,6 +28,28 @@ Flutter-приложение для управления устройствам�
 flutter pub get
 flutter run
 ```
+
+## Веб-версия
+
+Запустить в Chrome с API по умолчанию:
+
+```bash
+flutter run -d chrome
+```
+
+Собрать статические файлы для публикации по HTTPS:
+
+```bash
+flutter build web --release --dart-define=API_BASE_URL=https://api.smart-light.tech
+```
+
+Готовые файлы появятся в `build/web`. Для другого backend укажи его URL в
+`API_BASE_URL` во время сборки. Backend должен быть доступен браузеру по HTTPS;
+API включает CORS.
+
+Веб-версия позволяет входить в аккаунт и управлять уже добавленными устройствами.
+Первичное добавление ESP32 по BLE пока выполняется в мобильном или настольном
+приложении.
 
 Проверка проекта:
 

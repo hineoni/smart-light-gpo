@@ -272,4 +272,8 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get provisionDevice => 'Provision device';
+
+  @override
+  String get webBleUnavailable =>
+      'Initial ESP32 setup over Bluetooth is not available in the browser yet. Use the mobile or desktop app to add a device. You can manage already added devices here.';
 }

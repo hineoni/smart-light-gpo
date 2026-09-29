@@ -37,6 +37,7 @@ static const char *TAG = "BLE_PROVISIONING";
 static ble_prov_state_t s_prov_state = BLE_PROV_STATE_IDLE;
 static ble_prov_event_cb_t s_event_callback = NULL;
 static esp_timer_handle_t s_timeout_timer = NULL;
+static bool s_prov_manager_initialized = false;
 
 // Timeout для provisioning (10 минут)
 #define PROVISIONING_TIMEOUT_MS (10 * 60 * 1000)
@@ -271,17 +272,12 @@ esp_err_t ble_provisioning_start(ble_prov_event_cb_t event_cb)
 {
     ESP_LOGI(TAG, "Starting BLE provisioning");
     
-    // Проверяем, не инициализирован ли уже provisioning manager
-    bool already_provisioned = false;
-    esp_err_t check_ret = wifi_prov_mgr_is_provisioned(&already_provisioned);
-    if (check_ret == ESP_ERR_INVALID_STATE) {
-        // Manager не инициализирован - это нормально
-        ESP_LOGD(TAG, "Provisioning manager not initialized yet");
-    } else if (check_ret == ESP_OK) {
+    // wifi_prov_mgr_is_provisioned() checks stored Wi-Fi credentials, not
+    // whether the provisioning manager itself has been initialized.
+    if (s_prov_manager_initialized) {
         ESP_LOGW(TAG, "Provisioning manager already initialized, stopping first...");
-        // Корректно останавливаем
         ble_provisioning_stop();
-        vTaskDelay(pdMS_TO_TICKS(100)); // Даём время на cleanup
+        vTaskDelay(pdMS_TO_TICKS(100));
     }
     
     s_event_callback = event_cb;
@@ -324,6 +320,7 @@ esp_err_t ble_provisioning_start(ble_prov_event_cb_t event_cb)
         ESP_LOGE(TAG, "Failed to initialize provisioning manager: %s", esp_err_to_name(ret));
         return ret;
     }
+    s_prov_manager_initialized = true;
     
     // Генерируем имя сервиса
     char service_name[32];
@@ -335,6 +332,7 @@ esp_err_t ble_provisioning_start(ble_prov_event_cb_t event_cb)
     if (ret != ESP_OK) {
         ESP_LOGE(TAG, "Failed to start provisioning: %s", esp_err_to_name(ret));
         wifi_prov_mgr_deinit();
+        s_prov_manager_initialized = false;
         return ret;
     }
     
@@ -360,16 +358,12 @@ esp_err_t ble_provisioning_stop(void)
         esp_timer_stop(s_timeout_timer);
     }
     
-    // Останавливаем provisioning если он запущен
-    bool provisioned = false;
-    if (wifi_prov_mgr_is_provisioned(&provisioned) == ESP_OK && !provisioned) {
-        ESP_LOGI(TAG, "Stopping provisioning manager...");
-        wifi_prov_mgr_stop_provisioning();
+    if (s_prov_manager_initialized) {
+        // Deinitialization stops an active service and releases its BLE resources.
+        ESP_LOGI(TAG, "Deinitializing provisioning manager...");
+        wifi_prov_mgr_deinit();
+        s_prov_manager_initialized = false;
     }
-    
-    // ВАЖНО: Деинициализируем provisioning manager для корректного restart
-    ESP_LOGI(TAG, "Deinitializing provisioning manager...");
-    wifi_prov_mgr_deinit();
     
     s_prov_state = BLE_PROV_STATE_IDLE;
     s_event_callback = NULL;

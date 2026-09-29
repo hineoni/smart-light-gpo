@@ -273,4 +273,8 @@ class AppLocalizationsRu extends AppLocalizations {
 
   @override
   String get provisionDevice => 'Настроить устройство';
+
+  @override
+  String get webBleUnavailable =>
+      'Первичная настройка ESP32 по Bluetooth пока недоступна в браузере. Добавьте устройство через мобильное или настольное приложение. Уже добавленными устройствами можно управлять здесь.';
 }

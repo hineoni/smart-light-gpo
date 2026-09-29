@@ -211,11 +211,13 @@ esp_err_t wifi_manager_init(const device_config_t* config)
     ESP_ERROR_CHECK(esp_event_handler_register(WIFI_EVENT, ESP_EVENT_ANY_ID, &wifi_event_handler, NULL));
     ESP_ERROR_CHECK(esp_event_handler_register(IP_EVENT, IP_EVENT_STA_GOT_IP, &wifi_event_handler, NULL));
     
-    // Запуск в зависимости от валидности конфигурации
+    // Если конфигурация есть, запускаем Wi-Fi STA. Для пустой конфигурации
+    // не запускаем AP здесь: main() сразу включает BLE provisioning, который
+    // сам поднимет нужный BLE transport. AP останется fallback при ошибке BLE.
     if (config->is_valid) {
         ret = wifi_manager_start_sta(config);
     } else {
-        ret = wifi_manager_start_ap();
+        ESP_LOGI(TAG, "No WiFi config; deferring AP start until BLE provisioning fallback");
     }
     
     return ret;
