@@ -11,16 +11,11 @@ const schema = z.object({
 
 export default defineEventHandler(async (event) => {
   const data = schema.parse(await readBody(event));
-<<<<<<< HEAD
+
   const email = data.email.trim().toLowerCase();
 
   const user = await prisma.user.findUnique({
     where: { email },
-=======
-
-  const user = await prisma.user.findUnique({
-    where: { email: data.email },
->>>>>>> origin/web2
   });
 
   if (!user) {
@@ -30,7 +25,6 @@ export default defineEventHandler(async (event) => {
     });
   }
 
-<<<<<<< HEAD
   if (user.emailVerifiedAt) {
     throw createError({
       statusCode: 400,
@@ -38,8 +32,6 @@ export default defineEventHandler(async (event) => {
     });
   }
 
-=======
->>>>>>> origin/web2
   const verification = await prisma.emailVerificationCode.findFirst({
     where: { userId: user.id },
     orderBy: { createdAt: 'desc' },
@@ -82,6 +74,7 @@ export default defineEventHandler(async (event) => {
   ]);
 
   const payload = { userId: user.id, email: user.email };
+
   const accessToken = signAccessToken(payload);
   const refreshToken = signRefreshToken(payload);
 

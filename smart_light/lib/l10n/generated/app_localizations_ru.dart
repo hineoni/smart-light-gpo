@@ -30,10 +30,10 @@ class AppLocalizationsRu extends AppLocalizations {
   String get darkTheme => 'Тёмная тема';
 
   @override
-  String get emeraldTheme => 'Изумрудная тема';
+  String get emeraldTheme => 'Зелёная тема';
 
   @override
-  String get indigoTheme => 'Неоновая индиго-тема';
+  String get indigoTheme => 'Синяя тема';
 
   @override
   String get language => 'Язык';

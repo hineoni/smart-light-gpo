@@ -143,13 +143,13 @@ abstract class AppLocalizations {
   /// No description provided for @emeraldTheme.
   ///
   /// In en, this message translates to:
-  /// **'Emerald theme'**
+  /// **'Green theme'**
   String get emeraldTheme;
 
   /// No description provided for @indigoTheme.
   ///
   /// In en, this message translates to:
-  /// **'Neon indigo theme'**
+  /// **'Blue theme'**
   String get indigoTheme;
 
   /// No description provided for @language.

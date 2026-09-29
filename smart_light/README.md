@@ -14,12 +14,11 @@ Flutter-приложение для управления устройствам�
 
 ## Настройка backend
 
-Перед запуском замените тестовый адрес `http://172.20.10.13:3000` на адрес
-доступного backend в следующих файлах:
-
-- `lib/services/auth_service.dart`;
-- `lib/services/device_service.dart`;
-- `lib/screens/api_test_screen.dart`.
+Приложение для macOS и iOS по умолчанию подключается к
+`https://api.smart-light.tech`. Адрес закреплён в `lib/services/api_config.dart`;
+менять IP в сервисах не нужно. При BLE-настройке приложение передаёт плате
+`wss://api.smart-light.tech/_ws`. Локальные HTTP-адреса в BLE-сервисе
+используются только для настройки самой платы.
 
 Физическое устройство и телефон должны иметь сетевой доступ к backend.
 

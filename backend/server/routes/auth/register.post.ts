@@ -16,29 +16,15 @@ const schema = z.object({
 
 export default defineEventHandler(async (event) => {
   const data = schema.parse(await readBody(event));
-<<<<<<< HEAD
+
+  // Нормализуем email: убираем пробелы и приводим к нижнему регистру
   const email = data.email.trim().toLowerCase();
 
   const existingUser = await prisma.user.findUnique({
     where: { email },
   });
 
-  if (existingUser) {
-    throw createError({
-      statusCode: 409,
-      statusMessage: 'Email address already in use',
-    });
-  }
-
-  const user = await prisma.user.create({
-      data: {
-        email,
-=======
-
-  const existingUser = await prisma.user.findUnique({
-    where: { email: data.email },
-  });
-
+  // Если пользователь существует и уже подтвердил email, блокируем регистрацию
   if (existingUser?.emailVerifiedAt) {
     throw createError({
       statusCode: 409,
@@ -46,10 +32,30 @@ export default defineEventHandler(async (event) => {
     });
   }
 
-  const user = existingUser ?? await prisma.user.create({
+  let user;
+
+  if (existingUser) {
+    // Пользователь существует, но не подтвердил email.
+    // Обновляем его пароль и имя на случай, если он пытается зарегистрироваться заново.
+    user = await prisma.user.update({
+      where: { id: existingUser.id },
       data: {
-        email: data.email,
->>>>>>> origin/web2
+        passwordHash: await hashPassword(data.password),
+        name: data.name ?? existingUser.name,
+      },
+      select: {
+        id: true,
+        email: true,
+        name: true,
+        createdAt: true,
+        emailVerifiedAt: true,
+      },
+    });
+  } else {
+    // Пользователя не существует, создаем нового
+    user = await prisma.user.create({
+      data: {
+        email,
         passwordHash: await hashPassword(data.password),
         name: data.name,
       },
@@ -61,18 +67,21 @@ export default defineEventHandler(async (event) => {
         emailVerifiedAt: true,
       },
     });
+  }
 
   const code = createVerificationCode();
 
+  // Удаляем старые коды подтверждения, если они были
   await prisma.emailVerificationCode.deleteMany({
     where: { userId: user.id },
   });
 
+  // Создаем новый код
   await prisma.emailVerificationCode.create({
     data: {
       userId: user.id,
       codeHash: hashVerificationCode(code),
-      expiresAt: new Date(Date.now() + 10 * 60 * 1000),
+      expiresAt: new Date(Date.now() + 10 * 60 * 1000), // 10 минут
     },
   });
 
@@ -90,6 +99,7 @@ export default defineEventHandler(async (event) => {
     success: true,
     email: user.email,
     verificationRequired: true,
+    // В режиме разработки можно выводить код в консоль и отдавать в ответе
     ...(process.env.VERIFICATION_DELIVERY === 'console'
       ? { verificationCode: code }
       : {}),

@@ -30,6 +30,7 @@ class _PositioningScreenState extends State<PositioningScreen> {
   List<LightSceneModel> _scenes = [];
   String? _selectedZoneId;
   bool _isLoading = true;
+  bool _isFetching = false;
   bool _isSavingScene = false;
 
   @override
@@ -50,29 +51,40 @@ class _PositioningScreenState extends State<PositioningScreen> {
   }
 
   Future<void> _loadData({bool showLoader = true}) async {
+    if (_isFetching) return;
+    _isFetching = true;
     if (showLoader) {
       setState(() => _isLoading = true);
     }
 
-    final devicesFuture = DeviceService.getDevices();
-    final summaryFuture = DeviceService.getPositioningSummary();
-    final zonesFuture = DeviceService.getZones();
-    final scenesFuture = DeviceService.getScenes();
-    final devices = await devicesFuture;
-    final summary = await summaryFuture;
-    final zones = await zonesFuture;
-    final scenes = await scenesFuture;
+    try {
+      final devicesFuture = DeviceService.getDevices();
+      final summaryFuture = DeviceService.getPositioningSummary();
+      final zonesFuture = DeviceService.getZones();
+      final scenesFuture = DeviceService.getScenes();
+      final devices = await devicesFuture;
+      final summary = await summaryFuture;
+      final zones = await zonesFuture;
+      final scenes = await scenesFuture;
 
-    if (!mounted) return;
-
-    setState(() {
-      _devices = devices;
-      _summary = summary;
-      _zones = zones;
-      _scenes = scenes;
-      _selectedZoneId ??= zones.isNotEmpty ? zones.first.id : null;
-      _isLoading = false;
-    });
+      if (!mounted) return;
+      setState(() {
+        _devices = devices;
+        _summary = summary;
+        _zones = zones;
+        _scenes = scenes;
+        _selectedZoneId ??= zones.isNotEmpty ? zones.first.id : null;
+      });
+    } catch (error) {
+      if (showLoader && mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(error.toString())));
+      }
+    } finally {
+      _isFetching = false;
+      if (mounted && _isLoading) setState(() => _isLoading = false);
+    }
   }
 
   String _deviceName(String id) {
@@ -102,6 +114,7 @@ class _PositioningScreenState extends State<PositioningScreen> {
     final l10n = AppLocalizations.of(context)!;
     return Scaffold(
       appBar: AppBar(
+        centerTitle: true,
         title: Text(l10n.positioning),
         actions: [
           IconButton(
@@ -112,26 +125,29 @@ class _PositioningScreenState extends State<PositioningScreen> {
         ],
       ),
       body: RefreshIndicator(
-        onRefresh: _loadData,
-        child: _isLoading
-            ? const Center(child: CircularProgressIndicator())
-            : ListView(
-                padding: const EdgeInsets.all(16),
-                children: [
-                  _buildStatusPanel(context),
-                  const SizedBox(height: 16),
-                  _buildPositionScheme(context),
-                  const SizedBox(height: 16),
-                  _buildScenesPanel(context),
-                  const SizedBox(height: 16),
-                  _buildOrientationPanel(context),
-                  const SizedBox(height: 16),
-                  if (_summary.distances.isEmpty)
-                    _buildEmptyState()
-                  else
-                    _buildDistanceList(context),
-                ],
-              ),
+        onRefresh: () => _loadData(showLoader: false),
+        child: ListView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          padding: const EdgeInsets.all(16),
+          children: [
+            if (_isLoading) ...[
+              const LinearProgressIndicator(),
+              const SizedBox(height: 16),
+            ],
+            _buildScenesPanel(context),
+            const SizedBox(height: 16),
+            _buildStatusPanel(context),
+            const SizedBox(height: 16),
+            _buildPositionScheme(context),
+            const SizedBox(height: 16),
+            _buildOrientationPanel(context),
+            const SizedBox(height: 16),
+            if (_summary.distances.isEmpty)
+              _buildEmptyState()
+            else
+              _buildDistanceList(context),
+          ],
+        ),
       ),
     );
   }
@@ -176,17 +192,18 @@ class _PositioningScreenState extends State<PositioningScreen> {
                   tooltip: 'Новая сцена',
                   onPressed: _isSavingScene ? null : _showSaveSceneSheet,
                 ),
-                IconButton(
-                  icon: const Icon(Icons.auto_awesome),
-                  tooltip: 'Готовые сценарии',
-                  onPressed: _showPresetScenesSheet,
-                ),
               ],
             ),
             const SizedBox(height: 4),
             Text(
               'Сохраняет цвет, яркость, сервоприводы и привязку к зоне.',
               style: theme.textTheme.bodySmall,
+            ),
+            const SizedBox(height: 12),
+            OutlinedButton.icon(
+              onPressed: _showPresetScenesSheet,
+              icon: const Icon(Icons.auto_awesome),
+              label: const Text('Готовые пресеты'),
             ),
             const SizedBox(height: 12),
             InkWell(
@@ -443,15 +460,19 @@ class _PositioningScreenState extends State<PositioningScreen> {
           shrinkWrap: true,
           children: [
             const ListTile(
-              title: Text('Готовые сценарии'),
-              subtitle: Text('Выбери пресет, чтобы создать его из твоих устройств.'),
+              title: Text('Готовые пресеты'),
+              subtitle: Text(
+                'Выбери пресет, чтобы создать его из твоих устройств.',
+              ),
             ),
-            ...presets.map((preset) => ListTile(
-              leading: const Icon(Icons.light_mode_outlined),
-              title: Text(preset.$2),
-              subtitle: Text(preset.$3),
-              onTap: () => Navigator.pop(context, preset.$1),
-            )),
+            ...presets.map(
+              (preset) => ListTile(
+                leading: const Icon(Icons.light_mode_outlined),
+                title: Text(preset.$2),
+                subtitle: Text(preset.$3),
+                onTap: () => Navigator.pop(context, preset.$1),
+              ),
+            ),
           ],
         ),
       ),
@@ -468,7 +489,11 @@ class _PositioningScreenState extends State<PositioningScreen> {
     await _loadData(showLoader: false);
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(scene == null ? 'Не удалось создать сценарий' : 'Сценарий создан')),
+      SnackBar(
+        content: Text(
+          scene == null ? 'Не удалось создать сценарий' : 'Сценарий создан',
+        ),
+      ),
     );
   }
 

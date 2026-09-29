@@ -1,5 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
+import 'package:flutter/services.dart';
+import 'package:flutter/foundation.dart' show defaultTargetPlatform, kIsWeb, TargetPlatform;
 import 'package:flutter_esp_ble_prov/flutter_esp_ble_prov.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:http/http.dart' as http;
@@ -8,8 +10,13 @@ import 'package:flutter_blue_plus/flutter_blue_plus.dart';
 class BleProvisioningService {
   static const String devicePrefix = 'SmartLight_';
   static const String proofOfPossession = 'abcd1234';
+  static const MethodChannel _macBleChannel = MethodChannel('smart_light/macos_ble_provisioning');
 
   static Future<bool> requestPermissions() async {
+    if (!kIsWeb && defaultTargetPlatform == TargetPlatform.macOS) {
+      // CoreBluetooth requests macOS permission when scanning starts.
+      return true;
+    }
     final bluetooth = await Permission.bluetooth.request();
     final bluetoothScan = await Permission.bluetoothScan.request();
     final bluetoothConnect = await Permission.bluetoothConnect.request();
@@ -40,7 +47,9 @@ class BleProvisioningService {
       var subscription = FlutterBluePlus.onScanResults.listen((results) {
         if (results.isNotEmpty) {
           for (ScanResult result in results) {
-            String? name = result.device.localName;
+            final name = result.advertisementData.advName.isNotEmpty
+                ? result.advertisementData.advName
+                : result.device.platformName;
             if (name.startsWith(devicePrefix) && !foundDevices.contains(name)) {
               foundDevices.add(name);
               print('Found device: $name');
@@ -86,6 +95,10 @@ class BleProvisioningService {
         print('SUCCESS: Standard ESP provisioning with backend URL hack completed!');
         return true;
       }
+
+      if (!kIsWeb && defaultTargetPlatform == TargetPlatform.macOS) {
+        return false;
+      }
       
       print('Standard provisioning failed, trying direct BLE as fallback...');
       // Fallback к direct BLE если стандартный способ не сработал
@@ -128,6 +141,16 @@ class BleProvisioningService {
     String backendUrl,
   ) async {
     print('Using standard ESP BLE provisioning');
+
+    if (!kIsWeb && defaultTargetPlatform == TargetPlatform.macOS) {
+      final success = await _macBleChannel.invokeMethod<bool>('provisionWifi', {
+        'deviceName': deviceName,
+        'proofOfPossession': proofOfPossession,
+        'ssid': ssid,
+        'passphrase': '$password|ws:$backendUrl',
+      }).timeout(const Duration(seconds: 90));
+      return success == true;
+    }
     
     final flutterEspBleProv = FlutterEspBleProv();
     
@@ -149,8 +172,6 @@ class BleProvisioningService {
     
     // ХАК: добавляем backend URL к паролю через разделитель
     final hackPassword = '$password|ws:$backendUrl';
-    print('Original password: $password');
-    print('Hacked password: $hackPassword');
     
     // Используем полное имя устройства вместо prefix
     final success = await flutterEspBleProv.provisionWifi(
@@ -401,7 +422,6 @@ class BleProvisioningService {
       };
 
       final jsonString = json.encode(configData);
-      print('Sending JSON: $jsonString');
       final jsonBytes = utf8.encode(jsonString);
       
       // Ищем характеристику 1775ff53 (которая работала в прошлый раз)

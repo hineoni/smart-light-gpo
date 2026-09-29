@@ -45,7 +45,7 @@ class DeviceService {
         }).toList();
         print('[DEVICE_SERVICE] Returning ${devices.length} devices');
         if (devices.isEmpty) {
-          final claimedDevices = await claimOnlineDevices();
+          final claimedDevices = await claimOnlineDevices(maxAttempts: 1);
           if (claimedDevices.isNotEmpty) {
             return claimedDevices;
           }
@@ -96,8 +96,9 @@ class DeviceService {
 
   static Future<List<DeviceModel>> claimOnlineDevices({
     String? deviceId,
+    int maxAttempts = 6,
   }) async {
-    for (var attempt = 0; attempt < 6; attempt++) {
+    for (var attempt = 0; attempt < maxAttempts; attempt++) {
       try {
         final response = await _post(
           '/devices/claim-online',

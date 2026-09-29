@@ -1,5 +1,4 @@
-import 'dart:async';
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import '../l10n/generated/app_localizations.dart';
 import '../services/api_config.dart';
 import '../services/ble_provisioning_service.dart';
@@ -17,22 +16,8 @@ class _BleProvisioningScreenState extends State<BleProvisioningScreen> {
   bool isProvisioning = false;
   bool isManualSetup = false;
   String? selectedDevice;
-  final TextEditingController ssidController = TextEditingController(
-<<<<<<< HEAD
-    text: 'fbq', // Предустановленный SSID
-  );
-  final TextEditingController passwordController = TextEditingController(
-    text: '24351058', // Предустановленный пароль
-=======
-    text: '', // Предустановленный SSID
-  );
-  final TextEditingController passwordController = TextEditingController(
-    text: '', // Предустановленный пароль
->>>>>>> origin/web2
-  );
-  final TextEditingController backendUrlController = TextEditingController(
-    text: ApiConfig.deviceProvisioningBackendUrl,
-  );
+  final TextEditingController ssidController = TextEditingController();
+  final TextEditingController passwordController = TextEditingController();
   final TextEditingController deviceIpController = TextEditingController();
 
   @override
@@ -44,6 +29,9 @@ class _BleProvisioningScreenState extends State<BleProvisioningScreen> {
   @override
   void dispose() {
     BleProvisioningService.cleanup();
+    ssidController.dispose();
+    passwordController.dispose();
+    deviceIpController.dispose();
     super.dispose();
   }
 
@@ -63,42 +51,22 @@ class _BleProvisioningScreenState extends State<BleProvisioningScreen> {
   }
 
   Future<void> _startScan() async {
+    if (isScanning) return;
     setState(() {
       isScanning = true;
       devices.clear(); // Очищаем список перед новым сканированием
     });
 
     try {
-      // Используем StreamController для реального времени
-      Timer.periodic(const Duration(milliseconds: 500), (timer) async {
-        if (!isScanning) {
-          timer.cancel();
-          return;
-        }
-
-        final deviceList = await BleProvisioningService.scanDevices(
-          timeout: const Duration(seconds: 2), // Короткие сканы
-        );
-
-        if (mounted) {
-          setState(() {
-            // Добавляем только новые устройства
-            for (final device in deviceList) {
-              if (!devices.contains(device)) {
-                devices.add(device);
-                print('Real-time device added: $device');
-              }
-            }
-          });
-        }
-      });
-
-      // Останавливаем сканирование через 15 секунд
-      Timer(const Duration(seconds: 15), () {
-        if (mounted) {
-          setState(() => isScanning = false);
-        }
-      });
+      final deviceList = await BleProvisioningService.scanDevices(
+        timeout: const Duration(seconds: 15),
+      );
+      if (mounted) {
+        setState(() {
+          devices = deviceList;
+          isScanning = false;
+        });
+      }
     } catch (e) {
       if (mounted) {
         setState(() => isScanning = false);
@@ -122,7 +90,7 @@ class _BleProvisioningScreenState extends State<BleProvisioningScreen> {
       print('Starting full provisioning with:');
       print('  Device: ${selectedDevice!}');
       print('  SSID: ${ssidController.text}');
-      print('  Backend URL: ${backendUrlController.text}');
+      print('  Backend URL: ${ApiConfig.deviceProvisioningBackendUrl}');
 
       final success =
           await BleProvisioningService.provisionDeviceWithCustomData(
@@ -130,7 +98,7 @@ class _BleProvisioningScreenState extends State<BleProvisioningScreen> {
             proofOfPossession: 'abcd1234',
             ssid: ssidController.text,
             password: passwordController.text,
-            wsUrl: backendUrlController.text,
+            wsUrl: ApiConfig.deviceProvisioningBackendUrl,
             deviceId: '', // ESP32 сам определит свой ID
           );
 
@@ -210,7 +178,7 @@ class _BleProvisioningScreenState extends State<BleProvisioningScreen> {
     try {
       final success = await BleProvisioningService.setupBackendUrlManually(
         deviceIpController.text,
-        backendUrlController.text,
+        ApiConfig.deviceProvisioningBackendUrl,
       );
 
       if (mounted) {
@@ -340,6 +308,7 @@ class _BleProvisioningScreenState extends State<BleProvisioningScreen> {
                       const SizedBox(height: 16),
                       TextField(
                         controller: ssidController,
+                        onChanged: (_) => setState(() {}),
                         decoration: const InputDecoration(
                           labelText: 'Wi-Fi SSID',
                           prefixIcon: Icon(Icons.wifi),
@@ -355,15 +324,6 @@ class _BleProvisioningScreenState extends State<BleProvisioningScreen> {
                           border: OutlineInputBorder(),
                         ),
                         obscureText: true,
-                      ),
-                      const SizedBox(height: 12),
-                      TextField(
-                        controller: backendUrlController,
-                        decoration: const InputDecoration(
-                          labelText: 'Backend URL',
-                          prefixIcon: Icon(Icons.cloud),
-                          border: OutlineInputBorder(),
-                        ),
                       ),
                       const SizedBox(height: 20),
                       SizedBox(
