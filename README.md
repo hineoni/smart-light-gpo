@@ -5,14 +5,6 @@ UWB-позиционированием, backend на Nitro и мобильным
 Система позволяет управлять светодиодами и сервоприводами, объединять устройства
 в зоны, сохранять световые сцены и отслеживать взаимное расположение устройств.
 
-<p align="center">
-  <img
-    src="docs/images/use-case-diagram.png"
-    width="560"
-    alt="Диаграмма вариантов использования системы Smart Light"
-  />
-</p>
-
 ## Возможности
 
 - авторизация пользователей через регистрацию, вход, refresh-токены и защищенные Bearer-токеном эндпоинты;
@@ -145,25 +137,3 @@ flutter run -d chrome --web-port 5000 --dart-define=API_BASE_URL=http://localhos
 | `/_scalar` | ANY | Scalar UI для просмотра OpenAPI |
 
 Большинство эндпоинтов, кроме `/`, `/_ws`, `/health`, `/auth/register`, `/auth/login`, `/auth/refresh`, `/_openapi.json` и `/_scalar`, требуют заголовок `Authorization: Bearer <accessToken>`.
-
-## Интерфейс приложения
-
-| Регистрация | Авторизация |
-|:-----------:|:-----------:|
-| <img src="docs/images/interface-registration.png" width="300" alt="Экран регистрации" /> | <img src="docs/images/interface-login.png" width="300" alt="Экран авторизации" /> |
-
-| Список устройств | Управление устройством |
-|:----------------:|:----------------------:|
-| <img src="docs/images/interface-devices.png" width="300" alt="Список устройств пользователя" /> | <img src="docs/images/interface-device-control.png" width="300" alt="Управление сервоприводами и освещением" /> |
-
-| Подключение через BLE | UWB-позиционирование |
-|:---------------------:|:--------------------:|
-| <img src="docs/images/interface-ble-provisioning.png" width="300" alt="Поиск устройств через BLE" /> | <img src="docs/images/interface-positioning.png" width="300" alt="Экран расположения устройств и световых сцен" /> |
-
-| Создание световой сцены |
-|:-----------------------:|
-| <img src="docs/images/interface-new-scene.png" width="300" alt="Создание новой световой сцены" /> |
-
-## Рабочее устройство
-
-<img width="225" height="301" alt="изображение" src="https://github.com/user-attachments/assets/7ae5c681-5d60-4135-9cfe-1f4fa5c3230b" />
