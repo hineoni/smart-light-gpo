@@ -1,13 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 
 import '../l10n/generated/app_localizations.dart';
 import '../services/app_settings.dart';
 import '../services/auth_service.dart';
-import 'main_navigation_screen.dart';
-
-import 'password_reset_screen.dart';
-
-import 'register_screen.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -71,36 +67,22 @@ class _LoginScreenState extends State<LoginScreen> {
       return;
     }
 
-    Navigator.pushReplacement(
-      context,
-      MaterialPageRoute(builder: (_) => const MainNavigationScreen()),
-    );
+    context.go('/devices');
   }
 
   Future<void> _openRegister() async {
-    final registered = await Navigator.push<bool>(
-      context,
-      MaterialPageRoute(builder: (_) => const RegisterScreen()),
-    );
+    final registered = await context.push<bool>('/register');
 
     if (!mounted || registered != true) return;
 
-    Navigator.pushReplacement(
-      context,
-      MaterialPageRoute(builder: (_) => const MainNavigationScreen()),
-    );
+    context.go('/devices');
   }
 
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
     return Scaffold(
-      appBar: AppBar(
-        actions: [
-          const _ThemeToggleButton(),
-          _LanguageMenu(),
-        ],
-      ),
+      appBar: AppBar(actions: [const _ThemeToggleButton(), _LanguageMenu()]),
       body: SafeArea(
         child: Center(
           child: ConstrainedBox(
@@ -179,12 +161,7 @@ class _LoginScreenState extends State<LoginScreen> {
                         onPressed: _loading
                             ? null
                             : () {
-                                Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (_) => const PasswordResetScreen(),
-                                  ),
-                                );
+                                context.push('/password-reset');
                               },
                         child: const Text('Забыли пароль?'),
                       ),

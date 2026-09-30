@@ -69,6 +69,41 @@ flutter run
 по сборке прошивки и приложения находятся в `firmware/README.md` и
 `smart_light/README.md`.
 
+## Запуск Web-версии локально
+
+Для локального запуска нужны PostgreSQL, Node.js с pnpm и Flutter. Сначала создайте базу `smart_light` в PostgreSQL, затем настройте backend:
+
+```powershell
+cd backend
+Copy-Item .env.example .env
+```
+
+В `backend/.env` укажите подключение к PostgreSQL, задайте `EMAIL_CODE_SECRET` и добавьте:
+
+```dotenv
+CORS_ALLOWED_ORIGINS=http://localhost:5000
+VERIFICATION_DELIVERY=console
+```
+
+Затем установите зависимости и запустите backend:
+
+```powershell
+pnpm install
+pnpm exec prisma generate
+pnpm exec prisma migrate deploy
+pnpm dev
+```
+
+В отдельном терминале из корня репозитория запустите Flutter Web в Chrome:
+
+```powershell
+cd smart_light
+flutter pub get
+flutter run -d chrome --web-port 5000 --dart-define=API_BASE_URL=http://localhost:3000
+```
+
+Приложение откроется по адресу `http://localhost:5000`. В режиме `console` коды подтверждения выводятся backend в терминал. Для Web Bluetooth используйте Chrome и localhost.
+
 ## API
 
 | Путь | Метод | Назначение |

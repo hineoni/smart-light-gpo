@@ -1,14 +1,17 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter_localizations/flutter_localizations.dart';
+import 'package:flutter_web_plugins/url_strategy.dart';
+import 'package:go_router/go_router.dart';
+import 'app_router.dart';
 import 'l10n/generated/app_localizations.dart';
-import 'screens/main_navigation_screen.dart';
-import 'screens/login_screen.dart';
 import 'services/auth_service.dart';
 import 'services/app_settings.dart';
 import 'theme/light_theme.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  if (kIsWeb) usePathUrlStrategy();
   final settings = await AppSettings.load();
   runApp(MyApp(settings: settings));
 }
@@ -24,11 +27,19 @@ class MyApp extends StatefulWidget {
 
 class _MyAppState extends State<MyApp> {
   late final Future<bool> _restoreSession;
+  late final GoRouter _router;
+  bool _sessionReady = false;
 
   @override
   void initState() {
     super.initState();
-    _restoreSession = AuthService.restoreSession();
+    _restoreSession = AuthService.restoreSession()
+        .catchError((_) => false)
+        .then((authenticated) {
+          if (mounted) setState(() => _sessionReady = true);
+          return authenticated;
+        });
+    _router = createAppRouter(_restoreSession);
     widget.settings.addListener(_rebuild);
   }
 
@@ -42,7 +53,11 @@ class _MyAppState extends State<MyApp> {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
+    return MaterialApp.router(
+      routerConfig: _router,
+      builder: (context, child) => _sessionReady
+          ? child ?? const SizedBox.shrink()
+          : const Scaffold(body: Center(child: CircularProgressIndicator())),
       debugShowCheckedModeBanner: false,
       title: 'Smart Light Control',
       darkTheme: ThemeData(
@@ -71,20 +86,6 @@ class _MyAppState extends State<MyApp> {
         GlobalCupertinoLocalizations.delegate,
       ],
       supportedLocales: AppLocalizations.supportedLocales,
-      home: FutureBuilder<bool>(
-        future: _restoreSession,
-        builder: (context, snapshot) {
-          if (snapshot.connectionState != ConnectionState.done) {
-            return const Scaffold(
-              body: Center(child: CircularProgressIndicator()),
-            );
-          }
-
-          return snapshot.data == true
-              ? const MainNavigationScreen()
-              : const LoginScreen();
-        },
-      ),
     );
   }
 }

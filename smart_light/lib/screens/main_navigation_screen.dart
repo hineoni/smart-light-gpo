@@ -1,49 +1,29 @@
 import 'package:flutter/material.dart';
-import '../services/app_settings.dart';
-import 'device_list_screen.dart';
-import 'positioning_screen.dart';
-import 'settings_screen.dart';
+import 'package:go_router/go_router.dart';
 
 class MainNavigationScreen extends StatefulWidget {
-  const MainNavigationScreen({super.key});
+  const MainNavigationScreen({super.key, required this.navigationShell});
+
+  final StatefulNavigationShell navigationShell;
 
   @override
   State<MainNavigationScreen> createState() => _MainNavigationScreenState();
 }
 
 class _MainNavigationScreenState extends State<MainNavigationScreen> {
-  int _selectedIndex = 0;
-  final PageController _pageController = PageController();
-
-  final List<Widget> _screens = [
-    const DeviceListScreen(),
-    const PositioningScreen(),
-    SettingsScreen(settings: AppSettings.instance),
-  ];
-
-  @override
-  void dispose() {
-    _pageController.dispose();
-    super.dispose();
-  }
-
   void _selectPage(int index) {
-    setState(() => _selectedIndex = index);
-    _pageController.jumpToPage(index);
+    widget.navigationShell.goBranch(
+      index,
+      initialLocation: index == widget.navigationShell.currentIndex,
+    );
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: PageView(
-        controller: _pageController,
-        onPageChanged: (index) {
-          setState(() => _selectedIndex = index);
-        },
-        children: _screens,
-      ),
+      body: widget.navigationShell,
       bottomNavigationBar: _AppNavigationBar(
-        selectedIndex: _selectedIndex,
+        selectedIndex: widget.navigationShell.currentIndex,
         onSelected: _selectPage,
       ),
     );

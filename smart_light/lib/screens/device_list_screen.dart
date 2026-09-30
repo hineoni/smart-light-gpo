@@ -1,10 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import '../services/device_service.dart';
 import '../l10n/generated/app_localizations.dart';
 import '../models/device_model.dart';
-import 'device_control_screen.dart';
-import 'ble_provisioning_screen.dart';
-import 'api_test_screen.dart';
 
 class DeviceListScreen extends StatefulWidget {
   const DeviceListScreen({super.key});
@@ -64,10 +62,7 @@ class _DeviceListScreenState extends State<DeviceListScreen> {
             icon: const Icon(Icons.api),
             tooltip: l10n.apiTest,
             onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => const ApiTestScreen()),
-              );
+              context.push('/api-test');
             },
           ),
         ],
@@ -75,10 +70,7 @@ class _DeviceListScreenState extends State<DeviceListScreen> {
       floatingActionButton: FloatingActionButton(
         child: const Icon(Icons.add),
         onPressed: () async {
-          final provisioned = await Navigator.push<bool>(
-            context,
-            MaterialPageRoute(builder: (_) => const BleProvisioningScreen()),
-          );
+          final provisioned = await context.push<bool>('/provision-device');
           if (provisioned == true) {
             await DeviceService.claimOnlineDevices();
           }
@@ -147,11 +139,9 @@ class _DeviceListScreenState extends State<DeviceListScreen> {
           title: Text(device.name),
           trailing: const Icon(Icons.arrow_forward),
           onTap: () async {
-            await Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (_) => DeviceControlScreen(device: device),
-              ),
+            await context.push(
+              '/device/${Uri.encodeComponent(device.id)}',
+              extra: device,
             );
             if (mounted) await _refreshDevices();
           },

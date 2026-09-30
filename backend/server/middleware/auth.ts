@@ -20,9 +20,18 @@ const publicPrefixes = [
 export default defineEventHandler((event) => {
   const path = event.path || event.node.req.url || '';
 
-  event.node.res.setHeader('Access-Control-Allow-Origin', '*');
-  event.node.res.setHeader('Access-Control-Allow-Methods', 'GET,POST,PUT,DELETE,OPTIONS');
-  event.node.res.setHeader('Access-Control-Allow-Headers', 'Authorization,Content-Type');
+  const origin = getHeader(event, 'origin');
+  const allowedOrigins = (process.env.CORS_ALLOWED_ORIGINS || '')
+    .split(',')
+    .map((value) => value.trim())
+    .filter(Boolean);
+
+  if (origin && allowedOrigins.includes(origin)) {
+    event.node.res.setHeader('Access-Control-Allow-Origin', origin);
+    event.node.res.setHeader('Access-Control-Allow-Methods', 'GET,POST,PUT,DELETE,OPTIONS');
+    event.node.res.setHeader('Access-Control-Allow-Headers', 'Authorization,Content-Type');
+    event.node.res.setHeader('Vary', 'Origin');
+  }
 
   if (getMethod(event) === 'OPTIONS') {
     return sendNoContent(event);
