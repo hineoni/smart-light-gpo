@@ -104,6 +104,8 @@ flutter run -d chrome --web-port 5000 --dart-define=API_BASE_URL=http://localhos
 
 Приложение откроется по адресу `http://localhost:5000`. В режиме `console` коды подтверждения выводятся backend в терминал. Для Web Bluetooth используйте Chrome и localhost.
 
+Инструкции по запуску через Docker и развёртыванию на сервере: [`deploy/README.md`](deploy/README.md).
+
 ## API
 
 | Путь | Метод | Назначение |

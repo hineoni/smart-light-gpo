@@ -1,0 +1,28 @@
+services:
+  web:
+    build:
+      context: ./smart_light
+      args:
+        API_BASE_URL: ${API_BASE_URL:?Set API_BASE_URL to the public backend URL}
+        NGINX_CONFIG: deploy/nginx-frontend.conf
+    restart: unless-stopped
+
+  proxy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    environment:
+      FRONTEND_DOMAIN: ${FRONTEND_DOMAIN:?Set FRONTEND_DOMAIN in .env}
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    volumes:
+      - ./deploy/Caddyfile.frontend:/etc/caddy/Caddyfile:ro
+      - caddy_frontend_data:/data
+      - caddy_frontend_config:/config
+    depends_on:
+      - web
+
+volumes:
+  caddy_frontend_data:
+  caddy_frontend_config:
