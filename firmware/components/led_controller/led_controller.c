@@ -10,6 +10,12 @@
 static const char *TAG = "led_controller";
 
 #define RMT_LED_STRIP_RESOLUTION_HZ 10000000 // 10MHz resolution, 1 tick = 0.1us
+#define LED_MAX_OUTPUT 8 // Tested 8/255 physical channel ceiling for the 64-pixel matrix
+
+static uint8_t limited_channel(uint8_t color, uint8_t requested_brightness)
+{
+    return ((uint32_t)color * requested_brightness * LED_MAX_OUTPUT) / (255U * 255U);
+}
 
 // Структура для хранения состояния LED контроллера
 typedef struct {
@@ -47,7 +53,7 @@ esp_err_t led_controller_init(const led_controller_config_t *config)
     // Сохраняем конфигурацию
     s_led_state.led_count = config->led_count;
     s_led_state.gpio_pin = config->gpio_pin;
-    s_led_state.brightness = 255; // Максимальная яркость по умолчанию
+    s_led_state.brightness = 255; // Full requested range maps to the safe physical ceiling
 
     // Создаем RMT канал
     rmt_tx_channel_config_t tx_chan_config = {
@@ -129,9 +135,9 @@ esp_err_t led_controller_set_all_color(const led_rgb_t *color)
     s_led_state.current_color = *color;
 
     // Применяем яркость к цвету
-    uint8_t r = (color->r * s_led_state.brightness) / 255;
-    uint8_t g = (color->g * s_led_state.brightness) / 255;
-    uint8_t b = (color->b * s_led_state.brightness) / 255;
+    uint8_t r = limited_channel(color->r, s_led_state.brightness);
+    uint8_t g = limited_channel(color->g, s_led_state.brightness);
+    uint8_t b = limited_channel(color->b, s_led_state.brightness);
 
     // Устанавливаем цвет для всех светодиодов (формат GRB)
     for (int i = 0; i < s_led_state.led_count; i++) {
@@ -155,9 +161,9 @@ esp_err_t led_controller_set_color(int led_index, const led_rgb_t *color)
     }
 
     // Применяем яркость к цвету
-    uint8_t r = (color->r * s_led_state.brightness) / 255;
-    uint8_t g = (color->g * s_led_state.brightness) / 255;
-    uint8_t b = (color->b * s_led_state.brightness) / 255;
+    uint8_t r = limited_channel(color->r, s_led_state.brightness);
+    uint8_t g = limited_channel(color->g, s_led_state.brightness);
+    uint8_t b = limited_channel(color->b, s_led_state.brightness);
 
     // Устанавливаем цвет для конкретного светодиода (формат GRB)
     s_led_state.led_strip_pixels[led_index * 3 + 0] = g; // Green
@@ -211,7 +217,8 @@ esp_err_t led_controller_set_brightness(uint8_t brightness)
     }
 
     s_led_state.brightness = brightness;
-    ESP_LOGI(TAG, "Brightness set to %d", brightness);
+    ESP_LOGI(TAG, "Requested brightness %u/255; physical channel limit %u/255",
+             brightness, LED_MAX_OUTPUT);
     
     // Переприменяем текущий цвет с новой яркостью
     return led_controller_set_all_color(&s_led_state.current_color);

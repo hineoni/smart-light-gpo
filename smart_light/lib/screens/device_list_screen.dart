@@ -1,10 +1,8 @@
 import 'package:flutter/material.dart';
-import 'dart:async';
+import 'package:go_router/go_router.dart';
 import '../services/device_service.dart';
+import '../l10n/generated/app_localizations.dart';
 import '../models/device_model.dart';
-import 'device_control_screen.dart';
-import 'ble_provisioning_screen.dart';
-import 'api_test_screen.dart';
 
 class DeviceListScreen extends StatefulWidget {
   const DeviceListScreen({super.key});
@@ -14,48 +12,57 @@ class DeviceListScreen extends StatefulWidget {
 }
 
 class _DeviceListScreenState extends State<DeviceListScreen> {
-  late Future<List<DeviceModel>> _devicesFuture;
-  Timer? _refreshTimer;
+  List<DeviceModel>? _devices;
+  Object? _loadError;
+  bool _refreshing = false;
 
   @override
   void initState() {
     super.initState();
-    _loadDevices();
-    
-    // Автообновление каждые 5 секунд
-    _refreshTimer = Timer.periodic(const Duration(seconds: 5), (timer) {
-      if (mounted) {
-        setState(() {
-          _loadDevices();
-        });
+    _refreshDevices();
+  }
+
+  Future<void> _refreshDevices() async {
+    if (_refreshing) return;
+    _refreshing = true;
+    try {
+      final devices = await DeviceService.getDevices().timeout(
+        const Duration(seconds: 12),
+      );
+      if (!mounted) return;
+      setState(() {
+        _devices = devices;
+        _loadError = null;
+      });
+    } catch (error) {
+      if (!mounted) return;
+      setState(() => _loadError = error);
+      if (_devices != null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              AppLocalizations.of(context)!.errorWithDetails(error.toString()),
+            ),
+          ),
+        );
       }
-    });
-  }
-
-  @override
-  void dispose() {
-    _refreshTimer?.cancel();
-    super.dispose();
-  }
-
-  void _loadDevices() {
-    _devicesFuture = DeviceService.getDevices();
+    } finally {
+      _refreshing = false;
+    }
   }
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Мои устройства'),
+        title: Text(l10n.myDevices),
         actions: [
           IconButton(
             icon: const Icon(Icons.api),
-            tooltip: 'API Test',
+            tooltip: l10n.apiTest,
             onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => const ApiTestScreen()),
-              );
+              context.push('/api-test');
             },
           ),
         ],
@@ -63,97 +70,89 @@ class _DeviceListScreenState extends State<DeviceListScreen> {
       floatingActionButton: FloatingActionButton(
         child: const Icon(Icons.add),
         onPressed: () async {
-          await Navigator.push(
-            context,
-            MaterialPageRoute(builder: (_) => const BleProvisioningScreen()),
-          );
-          setState(() {
-            _loadDevices();
-          });
+          final provisioned = await context.push<bool>('/provision-device');
+          if (provisioned == true) {
+            await DeviceService.claimOnlineDevices();
+          }
+          if (mounted) await _refreshDevices();
         },
       ),
       body: RefreshIndicator(
-        onRefresh: () async {
-          setState(() {
-            _loadDevices();
-          });
-          // Ждем завершения загрузки
-          await _devicesFuture;
-        },
-        child: FutureBuilder<List<DeviceModel>>(
-          future: _devicesFuture,
-          builder: (context, snapshot) {
-            if (snapshot.connectionState == ConnectionState.waiting) {
-              return const Center(child: CircularProgressIndicator());
-            } else if (snapshot.hasError) {
-              return Center(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Text('Ошибка: ${snapshot.error}'),
-                    const SizedBox(height: 16),
-                    ElevatedButton(
-                      onPressed: () {
-                        setState(() {
-                          _loadDevices();
-                        });
-                      },
-                      child: const Text('Повторить'),
-                    ),
-                  ],
-                ),
-              );
-            } else if (!snapshot.hasData || snapshot.data!.isEmpty) {
-              // Важно! Для pull-to-refresh с пустым списком нужен scrollable widget
-              return ListView(
-                children: const [
-                  SizedBox(height: 200), // Отступ сверху
-                  Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(Icons.device_hub, size: 64, color: Colors.grey),
-                        SizedBox(height: 16),
-                        Text('Нет устройств', style: TextStyle(fontSize: 18)),
-                        SizedBox(height: 8),
-                        Text('Потяните вниз для обновления', style: TextStyle(fontSize: 12, color: Colors.grey)),
-                      ],
-                    ),
-                  ),
-                ],
-              );
-            } else {
-              final devices = snapshot.data!;
-              return ListView.builder(
-                itemCount: devices.length,
-                itemBuilder: (context, index) {
-                  final device = devices[index];
-                  return ListTile(
-                    title: Text(device.name),
-                    trailing: const Icon(Icons.arrow_forward),
-                    onTap: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) => DeviceControlScreen(device: device),
-                        ),
-                      );
-                    },
-                    onLongPress: () {
-                      _showDeviceOptions(context, device);
-                    },
-                  );
-                },
-              );
-            }
-          },
-        ),
+        onRefresh: _refreshDevices,
+        child: _buildDeviceList(l10n),
       ),
     );
   }
 
+  Widget _buildDeviceList(AppLocalizations l10n) {
+    final devices = _devices;
+    if (devices == null || devices.isEmpty) {
+      return CustomScrollView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        slivers: [
+          SliverFillRemaining(
+            hasScrollBody: false,
+            child: Center(
+              child: _loadError != null
+                  ? Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(l10n.errorWithDetails(_loadError.toString())),
+                        const SizedBox(height: 16),
+                        ElevatedButton(
+                          onPressed: _refreshDevices,
+                          child: Text(l10n.retry),
+                        ),
+                      ],
+                    )
+                  : devices == null
+                  ? const CircularProgressIndicator()
+                  : Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(
+                          Icons.device_hub,
+                          size: 64,
+                          color: Colors.grey,
+                        ),
+                        const SizedBox(height: 16),
+                        Text(
+                          l10n.noDevices,
+                          style: const TextStyle(fontSize: 18),
+                        ),
+                        const SizedBox(height: 8),
+                        Text(l10n.pullToRefresh),
+                      ],
+                    ),
+            ),
+          ),
+        ],
+      );
+    }
+
+    return ListView.builder(
+      physics: const AlwaysScrollableScrollPhysics(),
+      itemCount: devices.length,
+      itemBuilder: (context, index) {
+        final device = devices[index];
+        return ListTile(
+          title: Text(device.name),
+          trailing: const Icon(Icons.arrow_forward),
+          onTap: () async {
+            await context.push(
+              '/device/${Uri.encodeComponent(device.id)}',
+              extra: device,
+            );
+            if (mounted) await _refreshDevices();
+          },
+          onLongPress: () => _showDeviceOptions(context, device),
+        );
+      },
+    );
+  }
+
   void _showDeviceOptions(BuildContext context, DeviceModel device) {
-    final _controller = TextEditingController(text: device.name);
+    final controller = TextEditingController(text: device.name);
 
     showModalBottomSheet(
       context: context,
@@ -164,9 +163,9 @@ class _DeviceListScreenState extends State<DeviceListScreen> {
             mainAxisSize: MainAxisSize.min,
             children: [
               TextField(
-                controller: _controller,
-                decoration: const InputDecoration(
-                  labelText: 'Переименовать устройство',
+                controller: controller,
+                decoration: InputDecoration(
+                  labelText: AppLocalizations.of(context)!.renameDevice,
                 ),
               ),
               const SizedBox(height: 10),
@@ -177,14 +176,13 @@ class _DeviceListScreenState extends State<DeviceListScreen> {
                     onPressed: () async {
                       await DeviceService.renameDevice(
                         device.id,
-                        _controller.text,
+                        controller.text,
                       );
-                      setState(() {
-                        _loadDevices();
-                      });
+                      if (!context.mounted) return;
                       Navigator.pop(context);
+                      await _refreshDevices();
                     },
-                    child: const Text('Сохранить'),
+                    child: Text(AppLocalizations.of(context)!.save),
                   ),
                   ElevatedButton(
                     style: ElevatedButton.styleFrom(
@@ -192,12 +190,11 @@ class _DeviceListScreenState extends State<DeviceListScreen> {
                     ),
                     onPressed: () async {
                       await DeviceService.removeDevice(device.id);
-                      setState(() {
-                        _loadDevices();
-                      });
+                      if (!context.mounted) return;
                       Navigator.pop(context);
+                      await _refreshDevices();
                     },
-                    child: const Text('Удалить'),
+                    child: Text(AppLocalizations.of(context)!.delete),
                   ),
                 ],
               ),

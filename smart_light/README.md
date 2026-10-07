@@ -1,16 +1,62 @@
-# smart_light
+# Smart Light Control
 
-A new Flutter project.
+Flutter-приложение для управления устройствами Smart Light.
 
-## Getting Started
+## Возможности
 
-This project is a starting point for a Flutter application.
+- регистрация, вход и восстановление пользовательской сессии;
+- добавление и привязка доступных устройств;
+- управление цветом и яркостью LED;
+- управление положением сервоприводов;
+- создание зон и световых сцен;
+- просмотр расстояний и схемы UWB-позиционирования;
+- BLE-подготовка нового ESP32-устройства.
 
-A few resources to get you started if this is your first Flutter project:
+## Настройка backend
 
-- [Lab: Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Cookbook: Useful Flutter samples](https://docs.flutter.dev/cookbook)
+Приложение для macOS и iOS по умолчанию подключается к
+`https://api.smart-light.tech`. Адрес закреплён в `lib/services/api_config.dart`;
+менять IP в сервисах не нужно. При BLE-настройке приложение передаёт плате
+`wss://api.smart-light.tech/_ws`. Локальные HTTP-адреса в BLE-сервисе
+используются только для настройки самой платы.
 
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+Физическое устройство и телефон должны иметь сетевой доступ к backend.
+
+## Запуск
+
+```bash
+flutter pub get
+flutter run
+```
+
+## Веб-версия
+
+Запустить в Chrome с API по умолчанию:
+
+```bash
+flutter run -d chrome
+```
+
+Собрать статические файлы для публикации по HTTPS:
+
+```bash
+flutter build web --release --dart-define=API_BASE_URL=https://api.smart-light.tech
+```
+
+Готовые файлы появятся в `build/web`. Для другого backend укажи его URL в
+`API_BASE_URL` во время сборки. Backend должен быть доступен браузеру по HTTPS;
+API включает CORS.
+
+Веб-версия позволяет входить в аккаунт и управлять уже добавленными устройствами.
+Первичное добавление ESP32 по BLE пока выполняется в мобильном или настольном
+приложении.
+
+Проверка проекта:
+
+```bash
+flutter analyze
+flutter test
+```
+
+Для BLE и сетевых запросов приложению требуются соответствующие разрешения
+Android и iOS. Их конфигурация находится в платформенных каталогах проекта.

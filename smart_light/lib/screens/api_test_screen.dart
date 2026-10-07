@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 
+import '../services/api_config.dart';
+
 class ApiTestScreen extends StatefulWidget {
   const ApiTestScreen({super.key});
 
@@ -11,7 +13,7 @@ class ApiTestScreen extends StatefulWidget {
 
 class _ApiTestScreenState extends State<ApiTestScreen> {
   final TextEditingController _deviceIdController = TextEditingController(
-    text: 'smartlight_5966e0',
+    text: 'smartlight_0483085966e0',
   );
   final TextEditingController _servo1Controller = TextEditingController(
     text: '90',
@@ -33,19 +35,26 @@ class _ApiTestScreenState extends State<ApiTestScreen> {
   );
   String _response = '';
 
-  Future<void> _testGetDevices() async {
+  Future<void> _testGet(String path) async {
     try {
-      final response = await http.get(
-        Uri.parse('http://172.20.10.13:3000/devices'),
-      );
+      final response = await http.get(ApiConfig.uri(path));
       setState(() {
         _response =
-            'GET /devices\nStatus: ${response.statusCode}\nBody: ${response.body}';
+            'GET $path\nStatus: ${response.statusCode}\nBody: ${_prettyBody(response.body)}';
       });
     } catch (e) {
       setState(() {
         _response = 'Error: $e';
       });
+    }
+  }
+
+  String _prettyBody(String body) {
+    try {
+      const encoder = JsonEncoder.withIndent('  ');
+      return encoder.convert(jsonDecode(body));
+    } catch (_) {
+      return body;
     }
   }
 
@@ -56,9 +65,7 @@ class _ApiTestScreenState extends State<ApiTestScreen> {
         'servo2Angle': int.parse(_servo2Controller.text),
       });
       final response = await http.post(
-        Uri.parse(
-          'http://192.168.0.105:3000/devices/${_deviceIdController.text}/servo',
-        ),
+        ApiConfig.uri('/devices/${_deviceIdController.text}/servo'),
         headers: {'Content-Type': 'application/json'},
         body: body,
       );
@@ -82,9 +89,7 @@ class _ApiTestScreenState extends State<ApiTestScreen> {
         'colorB': int.parse(_colorBController.text),
       });
       final response = await http.post(
-        Uri.parse(
-          'http://192.168.0.105:3000/devices/${_deviceIdController.text}/led',
-        ),
+        ApiConfig.uri('/devices/${_deviceIdController.text}/led'),
         headers: {'Content-Type': 'application/json'},
         body: body,
       );
@@ -115,8 +120,27 @@ class _ApiTestScreenState extends State<ApiTestScreen> {
             TextField(controller: _deviceIdController),
             const SizedBox(height: 20),
             ElevatedButton(
-              onPressed: _testGetDevices,
+              onPressed: () => _testGet('/devices'),
               child: const Text('GET /devices'),
+            ),
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                ElevatedButton(
+                  onPressed: () => _testGet('/devices/online'),
+                  child: const Text('GET /devices/online'),
+                ),
+                ElevatedButton(
+                  onPressed: () => _testGet('/devices/distances'),
+                  child: const Text('GET /distances'),
+                ),
+                ElevatedButton(
+                  onPressed: () => _testGet('/devices/distances/summary'),
+                  child: const Text('GET /summary'),
+                ),
+              ],
             ),
             const SizedBox(height: 20),
             const Text(

@@ -2,14 +2,8 @@
 #include "esp_log.h"
 #include "esp_wifi.h"
 #include "esp_event.h"
-#include "wifi_provisioning/manager.h"
-#include "wifi_provisioning/scheme_ble.h"
-#include "esp_bt.h"
-#include "nimble/nimble_port.h"
-#include "nimble/nimble_port_freertos.h"
-#include "host/ble_hs.h"
-#include "host/ble_uuid.h"
-#include "host/ble_gap.h"
+#include "network_provisioning/manager.h"
+#include "network_provisioning/scheme_ble.h"
 #include "esp_timer.h"
 #include "config_storage.h"
 #include "nvs_flash.h"
@@ -17,12 +11,33 @@
 #include "freertos/task.h"
 #include <string.h>
 
+// ESP-IDF 6 moved wifi_provisioning into the external network_provisioning component.
+// Keep the existing module logic by aliasing the renamed APIs and event constants.
+#define WIFI_PROV_EVENT NETWORK_PROV_EVENT
+#define WIFI_PROV_START NETWORK_PROV_START
+#define WIFI_PROV_CRED_RECV NETWORK_PROV_WIFI_CRED_RECV
+#define WIFI_PROV_CRED_FAIL NETWORK_PROV_WIFI_CRED_FAIL
+#define WIFI_PROV_CRED_SUCCESS NETWORK_PROV_WIFI_CRED_SUCCESS
+#define WIFI_PROV_END NETWORK_PROV_END
+#define WIFI_PROV_SECURITY_1 NETWORK_PROV_SECURITY_1
+#define WIFI_PROV_STA_AUTH_ERROR NETWORK_PROV_WIFI_STA_AUTH_ERROR
+#define wifi_prov_sta_fail_reason_t network_prov_wifi_sta_fail_reason_t
+#define wifi_prov_mgr_config_t network_prov_mgr_config_t
+#define wifi_prov_scheme_ble network_prov_scheme_ble
+#define WIFI_PROV_SCHEME_BLE_EVENT_HANDLER_FREE_BT NETWORK_PROV_SCHEME_BLE_EVENT_HANDLER_FREE_BT
+#define wifi_prov_mgr_init network_prov_mgr_init
+#define wifi_prov_mgr_deinit network_prov_mgr_deinit
+#define wifi_prov_mgr_start_provisioning network_prov_mgr_start_provisioning
+#define wifi_prov_mgr_stop_provisioning network_prov_mgr_stop_provisioning
+#define wifi_prov_mgr_is_provisioned network_prov_mgr_is_wifi_provisioned
+
 static const char *TAG = "BLE_PROVISIONING";
 
 // Глобальные переменные
 static ble_prov_state_t s_prov_state = BLE_PROV_STATE_IDLE;
 static ble_prov_event_cb_t s_event_callback = NULL;
 static esp_timer_handle_t s_timeout_timer = NULL;
+static bool s_prov_manager_initialized = false;
 
 // Timeout для provisioning (10 минут)
 #define PROVISIONING_TIMEOUT_MS (10 * 60 * 1000)
@@ -41,7 +56,6 @@ static void config_save_task(void *pvParameters)
     
     ESP_LOGI(TAG, "=== Saving config in separate task ===");
     ESP_LOGI(TAG, "SSID: %s", data->ssid);
-    ESP_LOGI(TAG, "Real password: %s", data->real_password);
     ESP_LOGI(TAG, "Backend URL: %s", data->backend_url);
     
     // Сохраняем полную конфигурацию в storage
@@ -102,10 +116,7 @@ static void prov_event_handler(void *arg, esp_event_base_t event_base,
                 break;
             case WIFI_PROV_CRED_RECV: {
                 wifi_sta_config_t *wifi_sta_cfg = (wifi_sta_config_t *)event_data;
-                ESP_LOGI(TAG, "Received Wi-Fi credentials"
-                         "\n\tSSID     : %s\n\tPassword : %s",
-                         (const char *) wifi_sta_cfg->ssid,
-                         (const char *) wifi_sta_cfg->password);
+                ESP_LOGI(TAG, "Received Wi-Fi credentials over BLE");
                 
                 // Проверяем hack в пароле - ТОЛЬКО парсинг в event handler'е!
                 char *password = (char *)wifi_sta_cfg->password;
@@ -140,10 +151,17 @@ static void prov_event_handler(void *arg, esp_event_base_t event_base,
                         strncpy((char *)wifi_sta_cfg->password, config_data->real_password, sizeof(wifi_sta_cfg->password) - 1);
                         wifi_sta_cfg->password[sizeof(wifi_sta_cfg->password) - 1] = '\0';
                         
-                        ESP_LOGI(TAG, "Extracted - Real password: '%s', WebSocket URL: '%s'", 
-                                config_data->real_password, config_data->backend_url);
-                        ESP_LOGI(TAG, "WiFi password after replacement: '%s'", (char *)wifi_sta_cfg->password);
-                        ESP_LOGI(TAG, "WiFi password length: %d", strlen((char *)wifi_sta_cfg->password));
+                        // Network provisioning already called esp_wifi_set_config before this event.
+                        // Apply the extracted Wi-Fi password to the driver before its connect timer fires.
+                        wifi_config_t applied_config = {0};
+                        if (esp_wifi_get_config(WIFI_IF_STA, &applied_config) == ESP_OK) {
+                            memcpy(applied_config.sta.password, wifi_sta_cfg->password,
+                                   sizeof(applied_config.sta.password));
+                            esp_err_t apply_ret = esp_wifi_set_config(WIFI_IF_STA, &applied_config);
+                            if (apply_ret != ESP_OK) {
+                                ESP_LOGE(TAG, "Failed to apply Wi-Fi credentials: %s", esp_err_to_name(apply_ret));
+                            }
+                        }
                         
                         // Создаём задачу с достаточным стеком
                         xTaskCreate(config_save_task, "cfg_save", 4096, config_data, 5, NULL);
@@ -254,17 +272,12 @@ esp_err_t ble_provisioning_start(ble_prov_event_cb_t event_cb)
 {
     ESP_LOGI(TAG, "Starting BLE provisioning");
     
-    // Проверяем, не инициализирован ли уже provisioning manager
-    bool already_provisioned = false;
-    esp_err_t check_ret = wifi_prov_mgr_is_provisioned(&already_provisioned);
-    if (check_ret == ESP_ERR_INVALID_STATE) {
-        // Manager не инициализирован - это нормально
-        ESP_LOGD(TAG, "Provisioning manager not initialized yet");
-    } else if (check_ret == ESP_OK) {
+    // wifi_prov_mgr_is_provisioned() checks stored Wi-Fi credentials, not
+    // whether the provisioning manager itself has been initialized.
+    if (s_prov_manager_initialized) {
         ESP_LOGW(TAG, "Provisioning manager already initialized, stopping first...");
-        // Корректно останавливаем
         ble_provisioning_stop();
-        vTaskDelay(pdMS_TO_TICKS(100)); // Даём время на cleanup
+        vTaskDelay(pdMS_TO_TICKS(100));
     }
     
     s_event_callback = event_cb;
@@ -307,6 +320,7 @@ esp_err_t ble_provisioning_start(ble_prov_event_cb_t event_cb)
         ESP_LOGE(TAG, "Failed to initialize provisioning manager: %s", esp_err_to_name(ret));
         return ret;
     }
+    s_prov_manager_initialized = true;
     
     // Генерируем имя сервиса
     char service_name[32];
@@ -318,6 +332,7 @@ esp_err_t ble_provisioning_start(ble_prov_event_cb_t event_cb)
     if (ret != ESP_OK) {
         ESP_LOGE(TAG, "Failed to start provisioning: %s", esp_err_to_name(ret));
         wifi_prov_mgr_deinit();
+        s_prov_manager_initialized = false;
         return ret;
     }
     
@@ -343,16 +358,12 @@ esp_err_t ble_provisioning_stop(void)
         esp_timer_stop(s_timeout_timer);
     }
     
-    // Останавливаем provisioning если он запущен
-    bool provisioned = false;
-    if (wifi_prov_mgr_is_provisioned(&provisioned) == ESP_OK && !provisioned) {
-        ESP_LOGI(TAG, "Stopping provisioning manager...");
-        wifi_prov_mgr_stop_provisioning();
+    if (s_prov_manager_initialized) {
+        // Deinitialization stops an active service and releases its BLE resources.
+        ESP_LOGI(TAG, "Deinitializing provisioning manager...");
+        wifi_prov_mgr_deinit();
+        s_prov_manager_initialized = false;
     }
-    
-    // ВАЖНО: Деинициализируем provisioning manager для корректного restart
-    ESP_LOGI(TAG, "Deinitializing provisioning manager...");
-    wifi_prov_mgr_deinit();
     
     s_prov_state = BLE_PROV_STATE_IDLE;
     s_event_callback = NULL;

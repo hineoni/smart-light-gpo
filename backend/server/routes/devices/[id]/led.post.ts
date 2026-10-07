@@ -1,8 +1,10 @@
-import { getDevice } from '~/utils/deviceStorage';
+import { requireUserId } from '~/lib/currentUser';
+import { getUserDevice } from '~/utils/deviceStorage';
 import { sendToDevice } from '~/utils/wsRuntime';
 import { updateDeviceLed } from '~/utils/deviceStorage';
 
 export default defineEventHandler(async (event) => {
+  const userId = requireUserId(event);
   const deviceId = getRouterParam(event, 'id');
   
   if (!deviceId) {
@@ -12,7 +14,7 @@ export default defineEventHandler(async (event) => {
     });
   }
 
-  const device = getDevice(deviceId);
+  const device = await getUserDevice(userId, deviceId);
   if (!device) {
     throw createError({
       statusCode: 404,
@@ -78,10 +80,10 @@ export default defineEventHandler(async (event) => {
   // Обновляем локальное состояние
   switch (body.type) {
     case 'set_led_color':
-      updateDeviceLed(deviceId, undefined, body.r, body.g, body.b);
+      await updateDeviceLed(deviceId, undefined, body.r, body.g, body.b);
       break;
     case 'set_led_brightness':
-      updateDeviceLed(deviceId, body.brightness);
+      await updateDeviceLed(deviceId, body.brightness);
       break;
   }
 

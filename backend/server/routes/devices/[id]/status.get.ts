@@ -1,8 +1,10 @@
-import { getDevice, updateDeviceStatus } from '~/utils/deviceStorage';
+import { requireUserId } from '~/lib/currentUser';
+import { getUserDevice, updateDeviceStatus } from '~/utils/deviceStorage';
 
 export default defineEventHandler(async (event) => {
+  const userId = requireUserId(event);
   const id = getRouterParam(event, 'id');
-  const device = getDevice(id!);
+  const device = await getUserDevice(userId, id!);
 
   if (!device) {
     throw createError({
@@ -13,7 +15,7 @@ export default defineEventHandler(async (event) => {
 
   try {
     const response = await $fetch(`http://${device.ip}/api/status`);
-    updateDeviceStatus(id!, 'connected');
+    await updateDeviceStatus(id!, 'connected');
 
     return {
       device: id,
@@ -21,7 +23,7 @@ export default defineEventHandler(async (event) => {
       data: response
     };
   } catch (error) {
-    updateDeviceStatus(id!, 'disconnected');
+    await updateDeviceStatus(id!, 'disconnected');
 
     return {
       device: id,

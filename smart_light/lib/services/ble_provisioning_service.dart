@@ -1,15 +1,34 @@
 import 'dart:async';
 import 'dart:convert';
+import 'package:flutter/services.dart';
+import 'package:flutter/foundation.dart'
+    show defaultTargetPlatform, kIsWeb, TargetPlatform;
 import 'package:flutter_esp_ble_prov/flutter_esp_ble_prov.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:http/http.dart' as http;
-import 'package:flutter_blue_plus/flutter_blue_plus.dart';
+import 'package:flutter_blue_plus_windows/flutter_blue_plus_windows.dart';
+import 'package:esp_ble_prov_dart/esp_ble_prov_dart.dart' as web_prov;
 
 class BleProvisioningService {
   static const String devicePrefix = 'SmartLight_';
   static const String proofOfPossession = 'abcd1234';
+  static const MethodChannel _macBleChannel = MethodChannel(
+    'smart_light/macos_ble_provisioning',
+  );
+  static final Map<String, BluetoothDevice> _lastScanDevices = {};
+  static final Map<String, web_prov.EspBleDevice> _lastWebScanDevices = {};
 
   static Future<bool> requestPermissions() async {
+    // Web Bluetooth requests access from the browser's device picker when the
+    // user starts a scan; native permission_handler APIs do not apply on Web.
+    if (kIsWeb) return true;
+    if (!kIsWeb &&
+        (defaultTargetPlatform == TargetPlatform.macOS ||
+            defaultTargetPlatform == TargetPlatform.windows)) {
+      // macOS prompts through CoreBluetooth; Windows BLE has no runtime
+      // permission flow exposed through permission_handler.
+      return true;
+    }
     final bluetooth = await Permission.bluetooth.request();
     final bluetoothScan = await Permission.bluetoothScan.request();
     final bluetoothConnect = await Permission.bluetoothConnect.request();
@@ -21,28 +40,61 @@ class BleProvisioningService {
         location.isGranted;
   }
 
-  static Future<List<String>> scanDevices({Duration timeout = const Duration(seconds: 30)}) async {
+  static Future<List<String>> scanDevices({
+    Duration timeout = const Duration(seconds: 30),
+  }) async {
     print('Starting BLE scan for ESP devices...');
-    
+
+    if (kIsWeb) {
+      final provisioner = web_prov.EspBleProvisioner(
+        deviceNamePrefix: devicePrefix,
+        security: web_prov.Security1(pop: proofOfPossession),
+      );
+      final scannedDevices = await provisioner.scanDevices(duration: timeout);
+      _lastWebScanDevices
+        ..clear()
+        ..addEntries(
+          scannedDevices
+              .where((device) => device.name?.startsWith(devicePrefix) ?? false)
+              .map((device) => MapEntry(device.name!, device)),
+        );
+      return _lastWebScanDevices.keys.toList(growable: false);
+    }
+
     try {
       // Проверяем Bluetooth
       if (await FlutterBluePlus.isSupported == false) {
-        print("Bluetooth not supported by this device");
-        return [];
+        throw UnsupportedError('Bluetooth is not supported on this device.');
       }
 
       // Ждем когда Bluetooth включится
-      await FlutterBluePlus.adapterState.where((val) => val == BluetoothAdapterState.on).first;
-      
+      // Avoid leaving the UI in a permanent scanning state if Bluetooth is
+      // disabled or macOS has not granted Bluetooth access.
+      final adapterState = await FlutterBluePlus.adapterState
+          .where((state) => state == BluetoothAdapterState.on)
+          .first
+          .timeout(
+            const Duration(seconds: 10),
+            onTimeout: () => throw TimeoutException(
+              'Bluetooth did not become available. Turn on Bluetooth and make sure the computer has a BLE adapter.',
+            ),
+          );
+      print('Bluetooth adapter is ready: $adapterState');
+
       List<String> foundDevices = [];
-      
+      _lastScanDevices.clear();
+
       // Слушаем результаты сканирования (правильный способ по документации)
-      var subscription = FlutterBluePlus.onScanResults.listen((results) {
+      var subscription = FlutterBluePlus.scanResults.listen((results) {
+        if (!FlutterBluePlus.isScanningNow) return;
         if (results.isNotEmpty) {
           for (ScanResult result in results) {
-            String? name = result.device.localName;
-            if (name != null && name.startsWith(devicePrefix) && !foundDevices.contains(name)) {
+            final name = result.advertisementData.advName.isNotEmpty
+                ? result.advertisementData.advName
+                : result.device.platformName;
+            if (name.startsWith(devicePrefix) && !foundDevices.contains(name)) {
               foundDevices.add(name);
+              _lastScanDevices[name] = result.device;
               print('Found device: $name');
             }
           }
@@ -57,15 +109,17 @@ class BleProvisioningService {
 
       // Ждем завершения сканирования
       await FlutterBluePlus.isScanning.where((val) => val == false).first;
-      
-      print('Scan completed. Found ${foundDevices.length} devices: ${foundDevices.join(", ")}');
+
+      print(
+        'Scan completed. Found ${foundDevices.length} devices: ${foundDevices.join(", ")}',
+      );
       return foundDevices;
     } catch (e) {
       print('Scan error: $e');
       try {
         await FlutterBluePlus.stopScan();
       } catch (_) {}
-      return [];
+      rethrow;
     }
   }
 
@@ -77,16 +131,36 @@ class BleProvisioningService {
   ) async {
     try {
       print('Starting provisioning for device: $deviceName');
-      
+
+      if (kIsWeb) {
+        return await _provisionDeviceOnWeb(
+          deviceName: deviceName,
+          ssid: ssid,
+          password: password,
+          backendUrl: backendUrl,
+        );
+      }
+
       // Используем стандартный ESP BLE provisioning с хаком для передачи backend URL
       print('Using ESP BLE provisioning with backend URL hack...');
-      final success = await _standardProvisioning(deviceName, ssid, password, backendUrl);
-      
+      final success = await _standardProvisioning(
+        deviceName,
+        ssid,
+        password,
+        backendUrl,
+      );
+
       if (success) {
-        print('SUCCESS: Standard ESP provisioning with backend URL hack completed!');
+        print(
+          'SUCCESS: Standard ESP provisioning with backend URL hack completed!',
+        );
         return true;
       }
-      
+
+      if (!kIsWeb && defaultTargetPlatform == TargetPlatform.macOS) {
+        return false;
+      }
+
       print('Standard provisioning failed, trying direct BLE as fallback...');
       // Fallback к direct BLE если стандартный способ не сработал
       final bleSuccess = await _sendFullConfigViaBle(
@@ -95,16 +169,61 @@ class BleProvisioningService {
         password: password,
         wsUrl: backendUrl,
       );
-      
+
       if (bleSuccess) {
         print('SUCCESS: Direct BLE fallback completed!');
         return true;
       }
-      
+
       return false;
     } catch (e) {
       print('Provisioning failed: $e');
       return false;
+    }
+  }
+
+  static Future<bool> _provisionDeviceOnWeb({
+    required String deviceName,
+    required String ssid,
+    required String password,
+    required String backendUrl,
+  }) async {
+    final device = _lastWebScanDevices[deviceName];
+    if (device == null) {
+      throw StateError(
+        'The selected ESP32 is no longer available. Scan again.',
+      );
+    }
+
+    final provisioner = web_prov.EspBleProvisioner(
+      deviceNamePrefix: devicePrefix,
+      security: web_prov.Security1(pop: proofOfPossession),
+      responseTimeout: const Duration(seconds: 20),
+    );
+
+    try {
+      await provisioner.connect(
+        device: device,
+        connectionTimeout: const Duration(seconds: 30),
+      );
+      await provisioner.establishSession();
+      await provisioner.sendCredentials(
+        web_prov.WiFiConfig(
+          ssid: ssid,
+          // The firmware extracts the WebSocket URL from this delimiter and
+          // restores the original Wi-Fi password before connecting.
+          passphrase: '$password|ws:$backendUrl',
+        ),
+        timeout: const Duration(seconds: 60),
+      );
+      return true;
+    } finally {
+      try {
+        await provisioner.disconnect();
+      } catch (error) {
+        // The ESP32 may close BLE itself after joining Wi-Fi.
+        print('BLE disconnect after provisioning: $error');
+      }
     }
   }
 
@@ -119,7 +238,7 @@ class BleProvisioningService {
   }) async {
     return await provisionDevice(deviceName, ssid, password, wsUrl);
   }
-  
+
   /// Стандартное ESP BLE provisioning + HTTP backend setup
   static Future<bool> _standardProvisioning(
     String deviceName,
@@ -128,9 +247,21 @@ class BleProvisioningService {
     String backendUrl,
   ) async {
     print('Using standard ESP BLE provisioning');
-    
+
+    if (!kIsWeb && defaultTargetPlatform == TargetPlatform.macOS) {
+      final success = await _macBleChannel
+          .invokeMethod<bool>('provisionWifi', {
+            'deviceName': deviceName,
+            'proofOfPossession': proofOfPossession,
+            'ssid': ssid,
+            'passphrase': '$password|ws:$backendUrl',
+          })
+          .timeout(const Duration(seconds: 90));
+      return success == true;
+    }
+
     final flutterEspBleProv = FlutterEspBleProv();
-    
+
     // Сначала проверим доступные WiFi сети на устройстве
     try {
       print('Scanning WiFi networks on device...');
@@ -146,36 +277,39 @@ class BleProvisioningService {
 
     // Отправляем WiFi credentials с хаком для передачи backend URL
     print('Sending WiFi credentials with backend URL hack...');
-    
+
     // ХАК: добавляем backend URL к паролю через разделитель
     final hackPassword = '$password|ws:$backendUrl';
-    print('Original password: $password');
-    print('Hacked password: $hackPassword');
-    
+
     // Используем полное имя устройства вместо prefix
-    final success = await flutterEspBleProv.provisionWifi(
-      deviceName, // Полное имя устройства
-      proofOfPossession, 
-      ssid,
-      hackPassword, // Используем модифицированный пароль
-    ).timeout(
-      const Duration(seconds: 60), // Добавляем timeout
-      onTimeout: () {
-        print('WiFi provisioning timeout after 60 seconds');
-        return false;
-      },
-    );
-    
+    final success = await flutterEspBleProv
+        .provisionWifi(
+          deviceName, // Полное имя устройства
+          proofOfPossession,
+          ssid,
+          hackPassword, // Используем модифицированный пароль
+        )
+        .timeout(
+          const Duration(seconds: 60), // Добавляем timeout
+          onTimeout: () {
+            print('WiFi provisioning timeout after 60 seconds');
+            return false;
+          },
+        );
+
     print('Provisioning result: $success');
-    
+
     if (success == true) {
       print('WiFi credentials sent successfully');
       print('Device should be connecting to WiFi and restarting...');
-      
+
       // Ждем подключения устройства к WiFi и отправляем backend URL
       print('Waiting for device to connect to WiFi and sending backend URL...');
-      final backendSetupSuccess = await _setupBackendUrl(deviceName, backendUrl);
-      
+      final backendSetupSuccess = await _setupBackendUrl(
+        deviceName,
+        backendUrl,
+      );
+
       if (backendSetupSuccess) {
         print('Provisioning completed successfully');
         return true;
@@ -192,22 +326,27 @@ class BleProvisioningService {
   }
 
   /// Отправляет backend URL на устройство через HTTP API
-  static Future<bool> _setupBackendUrl(String deviceName, String backendUrl) async {
+  static Future<bool> _setupBackendUrl(
+    String deviceName,
+    String backendUrl,
+  ) async {
     // Генерируем device_id на основе deviceName
     final deviceId = deviceName.replaceAll(devicePrefix, '');
-    
+
     print('Waiting for device to reboot and connect to WiFi...');
-    await Future.delayed(const Duration(seconds: 15)); // Увеличиваем время ожидания
-    
+    await Future.delayed(
+      const Duration(seconds: 15),
+    ); // Увеличиваем время ожидания
+
     print('Starting device search in local network...');
     // Сначала пробуем найти устройство в сети
     final deviceIp = await _findDeviceInNetwork();
-    
+
     if (deviceIp != null) {
       print('Found device at IP: $deviceIp');
       return await _sendBackendConfig(deviceIp, backendUrl, deviceId);
     }
-    
+
     // Если не нашли, пробуем типичные IP адреса
     print('Device not found automatically, trying common IP addresses...');
     final possibleIps = [
@@ -218,38 +357,38 @@ class BleProvisioningService {
       '192.168.1.110',
       '192.168.0.110',
     ];
-    
+
     for (final ip in possibleIps) {
       final success = await _sendBackendConfig(ip, backendUrl, deviceId);
       if (success) {
         return true;
       }
     }
-    
+
     print('Could not send backend URL to any IP address');
     return false;
   }
-  
+
   /// Ищет устройство в локальной сети по HTTP запросам
   static Future<String?> _findDeviceInNetwork() async {
     print('Scanning local network for device...');
-    
+
     // Определяем подсеть (обычно 192.168.1.x или 192.168.0.x)
     final subnets = ['192.168.1', '192.168.0'];
-    
+
     for (final subnet in subnets) {
       print('Scanning subnet $subnet.x...');
       // Сканируем диапазон IP адресов
       final futures = <Future<String?>>[];
-      
+
       for (int i = 100; i <= 120; i++) {
         final ip = '$subnet.$i';
         futures.add(_checkDeviceAtIp(ip));
       }
-      
+
       // Ждем результатов со всех IP адресов
       final results = await Future.wait(futures, eagerError: false);
-      
+
       // Ищем первый успешный результат
       for (final result in results) {
         if (result != null) {
@@ -259,21 +398,21 @@ class BleProvisioningService {
       }
       print('No device found in subnet $subnet');
     }
-    
+
     print('Device not found in any subnet');
     return null;
   }
-  
+
   /// Проверяет, является ли IP адрес нашим устройством
   static Future<String?> _checkDeviceAtIp(String ip) async {
     try {
       final url = Uri.parse('http://$ip/api/status');
       final response = await http.get(url).timeout(const Duration(seconds: 2));
-      
+
       if (response.statusCode == 200) {
         // Проверяем, что это наше устройство по содержимому ответа
         final responseData = jsonDecode(response.body);
-        if (responseData.containsKey('device_type') || 
+        if (responseData.containsKey('device_type') ||
             responseData.containsKey('status') ||
             response.body.contains('SmartLight')) {
           return ip;
@@ -282,34 +421,34 @@ class BleProvisioningService {
     } catch (e) {
       // Игнорируем ошибки - устройство просто не доступно по этому IP
     }
-    
+
     return null;
   }
-  
+
   /// Отправляет конфигурацию backend на указанный IP
-  static Future<bool> _sendBackendConfig(String ip, String backendUrl, String deviceId) async {
+  static Future<bool> _sendBackendConfig(
+    String ip,
+    String backendUrl,
+    String deviceId,
+  ) async {
     try {
       print('Sending backend URL to $ip...');
-      
+
       final url = Uri.parse('http://$ip/api/setup-backend');
       final body = jsonEncode({
         'backend_url': backendUrl,
         'device_id': deviceId,
       });
-      
+
       print('Request body: $body');
-      
-      final response = await http.post(
-        url,
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: body,
-      ).timeout(const Duration(seconds: 8)); // Увеличиваем timeout
-      
+
+      final response = await http
+          .post(url, headers: {'Content-Type': 'application/json'}, body: body)
+          .timeout(const Duration(seconds: 8)); // Увеличиваем timeout
+
       print('Response from $ip: ${response.statusCode}');
       print('Response body: ${response.body}');
-      
+
       if (response.statusCode == 200) {
         final responseData = jsonDecode(response.body);
         if (responseData['status'] == 'success') {
@@ -324,12 +463,12 @@ class BleProvisioningService {
     } catch (e) {
       print('Failed to connect to $ip: $e');
     }
-    
+
     return false;
   }
 
   static Future<void> cleanup() async {
-    // Cleanup not needed for flutter_esp_ble_prov
+    _lastWebScanDevices.clear();
   }
 
   /// Ручная настройка backend URL по IP адресу устройства
@@ -340,10 +479,11 @@ class BleProvisioningService {
   }) async {
     try {
       print('Manually setting up backend URL for device at $deviceIp');
-      
+
       // Если device_id не указан, используем случайный
-      final finalDeviceId = deviceId ?? 'device_${DateTime.now().millisecondsSinceEpoch}';
-      
+      final finalDeviceId =
+          deviceId ?? 'device_${DateTime.now().millisecondsSinceEpoch}';
+
       return await _sendBackendConfig(deviceIp, backendUrl, finalDeviceId);
     } catch (e) {
       print('Manual backend setup failed: $e');
@@ -356,14 +496,14 @@ class BleProvisioningService {
     try {
       final url = Uri.parse('http://$deviceIp/api/status');
       final response = await http.get(url).timeout(const Duration(seconds: 5));
-      
+
       if (response.statusCode == 200) {
         return jsonDecode(response.body);
       }
     } catch (e) {
       print('Failed to get device config from $deviceIp: $e');
     }
-    
+
     return null;
   }
 
@@ -374,10 +514,10 @@ class BleProvisioningService {
     required String wsUrl,
   }) async {
     BluetoothDevice? connectedDevice;
-    
+
     try {
       print('Using flutter_blue_plus for direct BLE communication');
-      
+
       // Находим устройство
       BluetoothDevice? targetDevice = await _findBleDevice(deviceName);
       if (targetDevice == null) {
@@ -392,35 +532,31 @@ class BleProvisioningService {
       // Обнаруживаем сервисы
       List<BluetoothService> services = await targetDevice.discoverServices();
       print('Found ${services.length} services:');
-      
+
       // Формируем JSON с полной конфигурацией
-      final configData = {
-        'ssid': ssid,
-        'password': password,  
-        'ws_url': wsUrl,
-      };
+      final configData = {'ssid': ssid, 'password': password, 'ws_url': wsUrl};
 
       final jsonString = json.encode(configData);
-      print('Sending JSON: $jsonString');
       final jsonBytes = utf8.encode(jsonString);
-      
+
       // Ищем характеристику 1775ff53 (которая работала в прошлый раз)
       const targetCharUuid = '1775ff53-6b43-439b-877c-060f2d9bed07';
-      
+
       for (var service in services) {
         print('  Service: ${service.uuid}');
-        
+
         for (var char in service.characteristics) {
           print('    Char: ${char.uuid}');
-          
+
           // Пробуем найти нашу рабочую характеристику
-          if (char.uuid.toString().toLowerCase() == targetCharUuid.toLowerCase()) {
+          if (char.uuid.toString().toLowerCase() ==
+              targetCharUuid.toLowerCase()) {
             print('  -> Found target characteristic: ${char.uuid}');
-            
+
             try {
               await char.write(jsonBytes, withoutResponse: false);
               print('Data written successfully to target characteristic!');
-              
+
               // Даем время на обработку
               await Future.delayed(const Duration(seconds: 5));
               return true;
@@ -431,18 +567,20 @@ class BleProvisioningService {
         }
       }
 
-      print('Target characteristic $targetCharUuid not found - trying fallback');
-      
+      print(
+        'Target characteristic $targetCharUuid not found - trying fallback',
+      );
+
       // Fallback: ищем любую writable характеристику
       for (var service in services) {
         for (var char in service.characteristics) {
           if (char.properties.write || char.properties.writeWithoutResponse) {
             print('  -> Trying fallback characteristic: ${char.uuid}');
-            
+
             try {
               await char.write(jsonBytes, withoutResponse: false);
               print('Data written successfully to fallback characteristic!');
-              
+
               // Даем время на обработку
               await Future.delayed(const Duration(seconds: 5));
               return true;
@@ -455,7 +593,6 @@ class BleProvisioningService {
 
       print('No suitable characteristic found for custom config');
       return false;
-
     } catch (e) {
       print('Direct BLE config error: $e');
       return false;
@@ -474,18 +611,15 @@ class BleProvisioningService {
       }
 
       // Сканируем устройства
-      List<String> foundNames = await scanDevices(timeout: const Duration(seconds: 15));
-      
+      List<String> foundNames = await scanDevices(
+        timeout: const Duration(seconds: 15),
+      );
+
       if (foundNames.contains(deviceName)) {
         // Получаем последние результаты сканирования
-        final scanResults = FlutterBluePlus.lastScanResults;
-        for (ScanResult result in scanResults) {
-          if (result.device.localName == deviceName) {
-            return result.device;
-          }
-        }
+        return _lastScanDevices[deviceName];
       }
-      
+
       return null;
     } catch (e) {
       print('Find BLE device error: $e');

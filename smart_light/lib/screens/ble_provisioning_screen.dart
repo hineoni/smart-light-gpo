@@ -1,5 +1,7 @@
-import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
+import '../l10n/generated/app_localizations.dart';
+import '../services/api_config.dart';
 import '../services/ble_provisioning_service.dart';
 
 class BleProvisioningScreen extends StatefulWidget {
@@ -15,15 +17,8 @@ class _BleProvisioningScreenState extends State<BleProvisioningScreen> {
   bool isProvisioning = false;
   bool isManualSetup = false;
   String? selectedDevice;
-  final TextEditingController ssidController = TextEditingController(
-    text: '', // Предустановленный SSID
-  );
-  final TextEditingController passwordController = TextEditingController(
-    text: '', // Предустановленный пароль
-  );
-  final TextEditingController backendUrlController = TextEditingController(
-    text: 'ws://172.20.10.13:3000/_ws',
-  );
+  final TextEditingController ssidController = TextEditingController();
+  final TextEditingController passwordController = TextEditingController();
   final TextEditingController deviceIpController = TextEditingController();
 
   @override
@@ -35,15 +30,22 @@ class _BleProvisioningScreenState extends State<BleProvisioningScreen> {
   @override
   void dispose() {
     BleProvisioningService.cleanup();
+    ssidController.dispose();
+    passwordController.dispose();
+    deviceIpController.dispose();
     super.dispose();
   }
 
   Future<void> _initializeBle() async {
+    if (kIsWeb) return;
+
     final hasPermissions = await BleProvisioningService.requestPermissions();
     if (!hasPermissions) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('BLE permissions required')),
+          SnackBar(
+            content: Text(AppLocalizations.of(context)!.blePermissionsRequired),
+          ),
         );
       }
       return;
@@ -52,48 +54,43 @@ class _BleProvisioningScreenState extends State<BleProvisioningScreen> {
   }
 
   Future<void> _startScan() async {
+    if (isScanning) return;
     setState(() {
       isScanning = true;
       devices.clear(); // Очищаем список перед новым сканированием
     });
 
     try {
-      // Используем StreamController для реального времени
-      Timer.periodic(const Duration(milliseconds: 500), (timer) async {
-        if (!isScanning) {
-          timer.cancel();
-          return;
+      final deviceList = await BleProvisioningService.scanDevices(
+        timeout: kIsWeb
+            ? const Duration(seconds: 2)
+            : const Duration(seconds: 15),
+      );
+      if (mounted) {
+        setState(() {
+          devices = deviceList;
+          isScanning = false;
+        });
+        if (deviceList.isEmpty) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text(
+                'Устройства не найдены. Проверьте Bluetooth и режим настройки ESP32.',
+              ),
+            ),
+          );
         }
-
-        final deviceList = await BleProvisioningService.scanDevices(
-          timeout: const Duration(seconds: 2), // Короткие сканы
-        );
-
-        if (mounted) {
-          setState(() {
-            // Добавляем только новые устройства
-            for (final device in deviceList) {
-              if (!devices.contains(device)) {
-                devices.add(device);
-                print('Real-time device added: $device');
-              }
-            }
-          });
-        }
-      });
-
-      // Останавливаем сканирование через 15 секунд
-      Timer(const Duration(seconds: 15), () {
-        if (mounted) {
-          setState(() => isScanning = false);
-        }
-      });
+      }
     } catch (e) {
       if (mounted) {
         setState(() => isScanning = false);
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('Scan failed: $e')));
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              AppLocalizations.of(context)!.scanFailed(e.toString()),
+            ),
+          ),
+        );
       }
     }
   }
@@ -107,7 +104,7 @@ class _BleProvisioningScreenState extends State<BleProvisioningScreen> {
       print('Starting full provisioning with:');
       print('  Device: ${selectedDevice!}');
       print('  SSID: ${ssidController.text}');
-      print('  Backend URL: ${backendUrlController.text}');
+      print('  Backend URL: ${ApiConfig.deviceProvisioningBackendUrl}');
 
       final success =
           await BleProvisioningService.provisionDeviceWithCustomData(
@@ -115,7 +112,7 @@ class _BleProvisioningScreenState extends State<BleProvisioningScreen> {
             proofOfPossession: 'abcd1234',
             ssid: ssidController.text,
             password: passwordController.text,
-            wsUrl: backendUrlController.text,
+            wsUrl: ApiConfig.deviceProvisioningBackendUrl,
             deviceId: '', // ESP32 сам определит свой ID
           );
 
@@ -124,15 +121,13 @@ class _BleProvisioningScreenState extends State<BleProvisioningScreen> {
 
         if (success) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text(
-                'Устройство настроено! 🎉\nВся конфигурация отправлена через BLE.',
-              ),
+            SnackBar(
+              content: Text(AppLocalizations.of(context)!.deviceConfigured),
               duration: Duration(seconds: 3),
               backgroundColor: Colors.green,
             ),
           );
-          Navigator.pop(context);
+          Navigator.pop(context, true);
         } else {
           // Показываем опцию ручной настройки
           _showManualSetupDialog();
@@ -141,9 +136,13 @@ class _BleProvisioningScreenState extends State<BleProvisioningScreen> {
     } catch (e) {
       if (mounted) {
         setState(() => isProvisioning = false);
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('Error: $e')));
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              AppLocalizations.of(context)!.errorWithDetails(e.toString()),
+            ),
+          ),
+        );
       }
     }
   }
@@ -153,20 +152,17 @@ class _BleProvisioningScreenState extends State<BleProvisioningScreen> {
       context: context,
       builder: (BuildContext context) {
         return AlertDialog(
-          title: const Text('Manual Backend Setup'),
+          title: Text(AppLocalizations.of(context)!.manualBackendSetup),
           content: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Text(
-                'WiFi provisioning succeeded, but backend URL setup failed. '
-                'You can set it up manually by entering the device IP address:',
-              ),
+              Text(AppLocalizations.of(context)!.manualBackendSetupDescription),
               const SizedBox(height: 16),
               TextField(
                 controller: deviceIpController,
-                decoration: const InputDecoration(
-                  labelText: 'Device IP Address',
-                  hintText: 'e.g., 192.168.1.100',
+                decoration: InputDecoration(
+                  labelText: AppLocalizations.of(context)!.deviceIpAddress,
+                  hintText: AppLocalizations.of(context)!.deviceIpExample,
                   border: OutlineInputBorder(),
                 ),
               ),
@@ -175,11 +171,11 @@ class _BleProvisioningScreenState extends State<BleProvisioningScreen> {
           actions: [
             TextButton(
               onPressed: () => Navigator.of(context).pop(),
-              child: const Text('Skip'),
+              child: Text(AppLocalizations.of(context)!.skip),
             ),
             ElevatedButton(
               onPressed: _setupBackendManually,
-              child: const Text('Setup'),
+              child: Text(AppLocalizations.of(context)!.setup),
             ),
           ],
         );
@@ -196,7 +192,7 @@ class _BleProvisioningScreenState extends State<BleProvisioningScreen> {
     try {
       final success = await BleProvisioningService.setupBackendUrlManually(
         deviceIpController.text,
-        backendUrlController.text,
+        ApiConfig.deviceProvisioningBackendUrl,
       );
 
       if (mounted) {
@@ -204,15 +200,15 @@ class _BleProvisioningScreenState extends State<BleProvisioningScreen> {
 
         if (success) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Backend URL configured successfully!'),
+            SnackBar(
+              content: Text(AppLocalizations.of(context)!.backendConfigured),
             ),
           );
-          Navigator.pop(context);
+          Navigator.pop(context, true);
         } else {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Manual setup failed. Check device IP address.'),
+            SnackBar(
+              content: Text(AppLocalizations.of(context)!.manualSetupFailed),
             ),
           );
         }
@@ -220,17 +216,22 @@ class _BleProvisioningScreenState extends State<BleProvisioningScreen> {
     } catch (e) {
       if (mounted) {
         setState(() => isManualSetup = false);
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('Error: $e')));
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              AppLocalizations.of(context)!.errorWithDetails(e.toString()),
+            ),
+          ),
+        );
       }
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     return Scaffold(
-      appBar: AppBar(title: const Text('BLE Provisioning')),
+      appBar: AppBar(title: Text(l10n.bleProvisioning)),
       body: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
@@ -241,22 +242,30 @@ class _BleProvisioningScreenState extends State<BleProvisioningScreen> {
                   child: ElevatedButton(
                     onPressed: isScanning ? null : _startScan,
                     child: Text(
-                      isScanning ? 'Scanning...' : 'Scan for Devices',
+                      isScanning ? l10n.scanning : l10n.scanForDevices,
                     ),
                   ),
                 ),
                 const SizedBox(width: 8),
-                Text('Found: ${devices.length}'),
+                Text(l10n.foundDevices(devices.length)),
               ],
             ),
+            if (kIsWeb) ...[
+              const SizedBox(height: 12),
+              Text(
+                l10n.webBleInstructions,
+                textAlign: TextAlign.center,
+                style: Theme.of(context).textTheme.bodySmall,
+              ),
+            ],
             const SizedBox(height: 20),
             Expanded(
               child: devices.isEmpty
                   ? Center(
                       child: Text(
                         isScanning
-                            ? 'Scanning for ESP32 devices...'
-                            : 'No devices found. Tap "Scan for Devices"',
+                            ? l10n.scanningForDevices
+                            : l10n.noDevicesFound,
                         style: Theme.of(context).textTheme.bodyLarge,
                         textAlign: TextAlign.center,
                       ),
@@ -270,7 +279,9 @@ class _BleProvisioningScreenState extends State<BleProvisioningScreen> {
                         return Card(
                           elevation: isSelected ? 4 : 1,
                           color: isSelected
-                              ? Theme.of(context).primaryColor.withOpacity(0.1)
+                              ? Theme.of(
+                                  context,
+                                ).primaryColor.withValues(alpha: 0.1)
                               : null,
                           child: ListTile(
                             leading: Icon(
@@ -287,7 +298,7 @@ class _BleProvisioningScreenState extends State<BleProvisioningScreen> {
                                     : FontWeight.normal,
                               ),
                             ),
-                            subtitle: const Text('ESP32 Device'),
+                            subtitle: Text(l10n.esp32Device),
                             trailing: isSelected
                                 ? const Icon(Icons.check_circle)
                                 : null,
@@ -307,13 +318,13 @@ class _BleProvisioningScreenState extends State<BleProvisioningScreen> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        'Full Device Configuration',
+                        l10n.fullDeviceConfiguration,
                         style: Theme.of(context).textTheme.titleMedium
                             ?.copyWith(fontWeight: FontWeight.bold),
                       ),
                       const SizedBox(height: 8),
                       Text(
-                        'All settings will be sent via BLE in a single step',
+                        l10n.configurationDescription,
                         style: Theme.of(context).textTheme.bodySmall?.copyWith(
                           color: Colors.grey[600],
                         ),
@@ -321,8 +332,9 @@ class _BleProvisioningScreenState extends State<BleProvisioningScreen> {
                       const SizedBox(height: 16),
                       TextField(
                         controller: ssidController,
+                        onChanged: (_) => setState(() {}),
                         decoration: const InputDecoration(
-                          labelText: 'WiFi SSID',
+                          labelText: 'Wi-Fi SSID',
                           prefixIcon: Icon(Icons.wifi),
                           border: OutlineInputBorder(),
                         ),
@@ -330,21 +342,12 @@ class _BleProvisioningScreenState extends State<BleProvisioningScreen> {
                       const SizedBox(height: 12),
                       TextField(
                         controller: passwordController,
-                        decoration: const InputDecoration(
-                          labelText: 'WiFi Password',
+                        decoration: InputDecoration(
+                          labelText: l10n.wifiPassword,
                           prefixIcon: Icon(Icons.lock),
                           border: OutlineInputBorder(),
                         ),
                         obscureText: true,
-                      ),
-                      const SizedBox(height: 12),
-                      TextField(
-                        controller: backendUrlController,
-                        decoration: const InputDecoration(
-                          labelText: 'Backend URL',
-                          prefixIcon: Icon(Icons.cloud),
-                          border: OutlineInputBorder(),
-                        ),
                       ),
                       const SizedBox(height: 20),
                       SizedBox(
@@ -367,10 +370,10 @@ class _BleProvisioningScreenState extends State<BleProvisioningScreen> {
                               : const Icon(Icons.send),
                           label: Text(
                             selectedDevice == null
-                                ? 'Select Device First'
+                                ? l10n.selectDeviceFirst
                                 : isProvisioning
-                                ? 'Provisioning...'
-                                : 'Provision Device',
+                                ? l10n.provisioning
+                                : l10n.provisionDevice,
                           ),
                           style: ElevatedButton.styleFrom(
                             padding: const EdgeInsets.symmetric(vertical: 12),
