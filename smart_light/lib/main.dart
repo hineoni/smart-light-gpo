@@ -60,18 +60,7 @@ class _MyAppState extends State<MyApp> {
           : const Scaffold(body: Center(child: CircularProgressIndicator())),
       debugShowCheckedModeBanner: false,
       title: 'Smart Light Control',
-      darkTheme: ThemeData(
-        brightness: Brightness.dark,
-        fontFamily: 'Avenir Next',
-        textTheme: readableTextTheme(Brightness.dark),
-        navigationBarTheme: const NavigationBarThemeData(
-          backgroundColor: Color(0xFF1C1B1F),
-          indicatorColor: Color(0xFF3F51B5),
-          labelTextStyle: WidgetStatePropertyAll(
-            TextStyle(fontWeight: FontWeight.w600),
-          ),
-        ),
-      ),
+      darkTheme: buildDarkTheme(),
       themeMode: widget.settings.themeMode,
       theme: widget.settings.theme == AppTheme.emerald
           ? buildGreenTheme()

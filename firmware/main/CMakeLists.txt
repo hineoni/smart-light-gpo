@@ -11,6 +11,7 @@ idf_component_register(
         uwb_positioning
         web_server
         websocket_client
+        light_sensor
         esp_wifi
         esp_http_server
         nvs_flash

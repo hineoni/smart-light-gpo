@@ -5,6 +5,10 @@ import '../models/device_model.dart';
 import '../services/device_service.dart';
 import '../widgets/compact_servo_control.dart';
 import '../widgets/light_control.dart';
+import '../widgets/ambient_light_card.dart';
+import '../models/ambient_light_reading.dart';
+import '../services/ambient_light_service.dart';
+import '../services/app_settings.dart';
 
 class DeviceControlScreen extends StatefulWidget {
   final DeviceModel device;
@@ -12,7 +16,18 @@ class DeviceControlScreen extends StatefulWidget {
   const DeviceControlScreen({
     super.key,
     required this.device,
+    this.readLamp = AmbientLightService.readLamp,
+    this.turnOnLamp = DeviceService.turnOnLamp,
+    this.switchOffLamp = DeviceService.switchOffLamp,
+    this.setBrightness = DeviceService.applyRecommendedBrightness,
+    this.checkOnline = DeviceService.checkDeviceStatus,
   }); // const можно оставить
+
+  final Future<LampState?> Function(String) readLamp;
+  final Future<void> Function(DeviceModel, double) turnOnLamp;
+  final Future<void> Function(DeviceModel) switchOffLamp;
+  final Future<void> Function(String, double) setBrightness;
+  final Future<bool> Function(String) checkOnline;
 
   @override
   State<DeviceControlScreen> createState() => _DeviceControlScreenState();
@@ -22,19 +37,83 @@ class _DeviceControlScreenState extends State<DeviceControlScreen> {
   Timer? _brightnessTimer;
   Timer? _servo1Timer;
   Timer? _servo2Timer;
-  bool _isLightOn = true; // Состояние включения света
+  Timer? _stateTimer;
+  LampState? _lamp;
+  bool _commandPending = false;
+  bool _readingState = false;
+  bool get _isLightOn => _lamp?.isOn ?? false;
   bool _isDeviceOnline = true; // Статус подключения устройства
 
   @override
   void initState() {
     super.initState();
     _checkDeviceStatus();
+    _refreshLamp();
+    _stateTimer = Timer.periodic(
+      const Duration(seconds: 2),
+      (_) => _refreshLamp(),
+    );
+  }
+
+  Future<void> _refreshLamp() async {
+    if (_readingState ||
+        _commandPending ||
+        (_brightnessTimer?.isActive ?? false)) {
+      return;
+    }
+    _readingState = true;
+    try {
+      final lamp = await widget.readLamp(widget.device.id);
+      if (!mounted || _commandPending) return;
+      setState(() {
+        _lamp = lamp;
+        if (lamp?.isOn == true) {
+          widget.device.brightness = lamp!.brightness / 255;
+          widget.device.color = Color.fromRGBO(lamp.r, lamp.g, lamp.b, 1);
+          AppSettings.instance.rememberLampBrightness(
+            widget.device.id,
+            widget.device.brightness,
+          );
+        } else {
+          widget.device.brightness = AppSettings.instance.lastLampBrightness(
+            widget.device.id,
+            fallback: widget.device.brightness,
+          );
+        }
+      });
+    } catch (_) {
+      if (mounted) setState(() => _lamp = null);
+    } finally {
+      _readingState = false;
+    }
+  }
+
+  Future<void> _runLampCommand(Future<void> Function() command) async {
+    if (_commandPending) return;
+    setState(() => _commandPending = true);
+    try {
+      await command();
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(AppLocalizations.of(context)!.lampCommandFailed),
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _commandPending = false);
+        await _refreshLamp();
+      }
+    }
   }
 
   // Проверка статуса устройства при открытии экрана
   void _checkDeviceStatus() async {
     try {
-      final response = await DeviceService.checkDeviceStatus(widget.device.id);
+      final response = await widget.checkOnline(widget.device.id);
+      if (!mounted) return;
       setState(() {
         _isDeviceOnline = response;
       });
@@ -43,7 +122,8 @@ class _DeviceControlScreenState extends State<DeviceControlScreen> {
         _showDeviceOfflineDialog();
       }
     } catch (e) {
-      print('Ошибка проверки статуса устройства: $e');
+      if (!mounted) return;
+      debugPrint('Ошибка проверки статуса устройства: $e');
       setState(() {
         _isDeviceOnline = false;
       });
@@ -88,13 +168,7 @@ class _DeviceControlScreenState extends State<DeviceControlScreen> {
     _brightnessTimer = Timer(const Duration(milliseconds: 300), () {
       if (_isLightOn) {
         // Отправляем только если свет включен
-        DeviceService.updateLed(
-          widget.device.id,
-          value,
-          widget.device.color.red,
-          widget.device.color.green,
-          widget.device.color.blue,
-        );
+        _runLampCommand(() => widget.setBrightness(widget.device.id, value));
       }
     });
   }
@@ -118,22 +192,20 @@ class _DeviceControlScreenState extends State<DeviceControlScreen> {
   }
 
   void _toggleLight() {
-    setState(() {
-      _isLightOn = !_isLightOn;
-    });
-
+    if (_lamp == null || _commandPending) return;
+    _brightnessTimer?.cancel();
     if (_isLightOn) {
-      // Включаем свет с текущими параметрами
-      DeviceService.updateLed(
+      AppSettings.instance.rememberLampBrightness(
         widget.device.id,
         widget.device.brightness,
-        widget.device.color.red,
-        widget.device.color.green,
-        widget.device.color.blue,
       );
+      _runLampCommand(() => widget.switchOffLamp(widget.device));
     } else {
-      // Выключаем свет (clear_leds команда)
-      DeviceService.turnOffLeds(widget.device.id);
+      final brightness = AppSettings.instance.lastLampBrightness(
+        widget.device.id,
+        fallback: widget.device.brightness,
+      );
+      _runLampCommand(() => widget.turnOnLamp(widget.device, brightness));
     }
   }
 
@@ -142,6 +214,7 @@ class _DeviceControlScreenState extends State<DeviceControlScreen> {
     _brightnessTimer?.cancel();
     _servo1Timer?.cancel();
     _servo2Timer?.cancel();
+    _stateTimer?.cancel();
     super.dispose();
   }
 
@@ -153,6 +226,8 @@ class _DeviceControlScreenState extends State<DeviceControlScreen> {
         padding: const EdgeInsets.all(16),
         child: Column(
           children: [
+            LiveAmbientLightCard(deviceId: widget.device.id),
+            const SizedBox(height: 20),
             // Компактные сервоприводы в одной строке
             Row(
               children: [
@@ -180,6 +255,14 @@ class _DeviceControlScreenState extends State<DeviceControlScreen> {
               brightness: widget.device.brightness,
               color: widget.device.color,
               isLightOn: _isLightOn,
+              enabled: _lamp != null && !_commandPending,
+              statusText: _commandPending
+                  ? AppLocalizations.of(context)!.lampWaitingConfirmation
+                  : _lamp == null
+                  ? AppLocalizations.of(context)!.lampStateUnknown
+                  : _isLightOn
+                  ? '${AppLocalizations.of(context)!.lampIsOn} · ${(_lamp!.brightness * 100 / 255).round()}%'
+                  : AppLocalizations.of(context)!.lampIsOff,
               onBrightnessChanged: _updateBrightnessDebounced,
               onColorChanged: (c) {
                 setState(() => widget.device.color = c);
@@ -188,9 +271,9 @@ class _DeviceControlScreenState extends State<DeviceControlScreen> {
                   DeviceService.updateLed(
                     widget.device.id,
                     widget.device.brightness,
-                    c.red,
-                    c.green,
-                    c.blue,
+                    (c.r * 255).round(),
+                    (c.g * 255).round(),
+                    (c.b * 255).round(),
                   );
                 }
               },

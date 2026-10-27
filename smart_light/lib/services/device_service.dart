@@ -5,6 +5,8 @@ import '../models/device_distance_model.dart';
 import '../models/light_scene_model.dart';
 import 'api_config.dart';
 import 'auth_service.dart';
+import 'ambient_light_service.dart';
+import 'app_settings.dart';
 
 class DeviceService {
   static Map<String, String> get _headers => AuthService.authHeaders;
@@ -123,6 +125,9 @@ class DeviceService {
     return [];
   }
 
+  static Future<List<DeviceModel>> claimSensorDevice(String deviceId) =>
+      claimOnlineDevices(deviceId: deviceId, maxAttempts: 1);
+
   static Future<void> removeDevice(String id) async {
     try {
       final response = await _delete('/devices/$id');
@@ -214,6 +219,74 @@ class DeviceService {
     } catch (e) {
       print('[DEVICE_SERVICE] Error turning off LEDs: $e');
     }
+  }
+
+  static Future<void> _sendLedCommand(
+    String deviceId,
+    Map<String, dynamic> command,
+  ) async {
+    final response = await _post(
+      '/devices/$deviceId/led',
+      body: json.encode(command),
+    ).timeout(const Duration(seconds: 5));
+    if (response.statusCode != 200) {
+      throw StateError('Lamp command failed (${response.statusCode})');
+    }
+  }
+
+  static Future<void> turnOnLamp(DeviceModel device, double brightness) async {
+    final started = DateTime.now();
+    // Set brightness before color so an initially black lamp cannot flash at 100%.
+    await _sendLedCommand(device.id, {
+      'type': 'set_led_brightness',
+      'brightness': (brightness.clamp(0.0, 1.0) * 255).round(),
+    });
+    final rgb = device.color.toARGB32();
+    final r = (rgb >> 16) & 0xff;
+    final g = (rgb >> 8) & 0xff;
+    final b = rgb & 0xff;
+    final black = r + g + b == 0;
+    await _sendLedCommand(device.id, {
+      'type': 'set_led_color',
+      'r': black ? 255 : r,
+      'g': black ? 255 : g,
+      'b': black ? 255 : b,
+    });
+    await AmbientLightService.confirmLamp(
+      device.id,
+      isOn: true,
+      brightness: brightness,
+      after: started,
+    );
+    await AppSettings.instance.rememberLampBrightness(device.id, brightness);
+  }
+
+  static Future<void> switchOffLamp(DeviceModel device) async {
+    final started = DateTime.now();
+    await _sendLedCommand(device.id, {'type': 'clear_leds'});
+    await AmbientLightService.confirmLamp(
+      device.id,
+      isOn: false,
+      after: started,
+    );
+  }
+
+  static Future<void> applyRecommendedBrightness(
+    String deviceId,
+    double brightness,
+  ) async {
+    final started = DateTime.now();
+    await _sendLedCommand(deviceId, {
+      'type': 'set_led_brightness',
+      'brightness': (brightness.clamp(0.0, 1.0) * 255).round(),
+    });
+    await AmbientLightService.confirmLamp(
+      deviceId,
+      isOn: brightness > 0,
+      brightness: brightness,
+      after: started,
+    );
+    await AppSettings.instance.rememberLampBrightness(deviceId, brightness);
   }
 
   static Future<List<DeviceModel>> getOnlineDevices() async {

@@ -67,6 +67,15 @@ class SettingsScreen extends StatelessWidget {
                 ),
               ),
               const Divider(),
+              _SectionTitle(l10n.lightingAdvice),
+              SwitchListTile.adaptive(
+                secondary: const Icon(Icons.tips_and_updates_outlined),
+                title: Text(l10n.lightingAdvice),
+                subtitle: Text(l10n.lightingAdviceDescription),
+                value: settings.lightingAdviceEnabled,
+                onChanged: settings.setLightingAdviceEnabled,
+              ),
+              const Divider(),
               _SectionTitle(l10n.account),
               ListTile(
                 leading: const Icon(Icons.logout),

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import '../l10n/generated/app_localizations.dart';
 
 class MainNavigationScreen extends StatefulWidget {
   const MainNavigationScreen({super.key, required this.navigationShell});
@@ -42,17 +43,26 @@ class _AppNavigationBar extends StatelessWidget {
   static const _icons = [
     Icons.devices_outlined,
     Icons.hub_outlined,
+    Icons.tips_and_updates_outlined,
     Icons.settings_outlined,
   ];
   static const _selectedIcons = [
     Icons.devices_other,
     Icons.hub,
+    Icons.tips_and_updates,
     Icons.settings,
   ];
 
   @override
   Widget build(BuildContext context) {
     final colors = Theme.of(context).colorScheme;
+    final l10n = AppLocalizations.of(context)!;
+    final labels = [
+      l10n.myDevices,
+      l10n.positioning,
+      l10n.lightingAdvice,
+      l10n.settings,
+    ];
     return SafeArea(
       top: false,
       bottom: false,
@@ -66,22 +76,30 @@ class _AppNavigationBar extends StatelessWidget {
               final selected = index == selectedIndex;
               return Expanded(
                 child: Center(
-                  child: InkWell(
-                    borderRadius: BorderRadius.circular(8),
-                    onTap: () => onSelected(index),
-                    child: AnimatedContainer(
-                      duration: const Duration(milliseconds: 180),
-                      width: 64,
-                      height: 64,
-                      decoration: BoxDecoration(
-                        color: selected ? colors.primaryContainer : null,
+                  child: Tooltip(
+                    message: labels[index],
+                    child: Semantics(
+                      label: labels[index],
+                      selected: selected,
+                      button: true,
+                      child: InkWell(
                         borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Icon(
-                        selected ? _selectedIcons[index] : _icons[index],
-                        color: selected
-                            ? colors.onPrimaryContainer
-                            : colors.onSurfaceVariant,
+                        onTap: () => onSelected(index),
+                        child: AnimatedContainer(
+                          duration: const Duration(milliseconds: 180),
+                          width: 64,
+                          height: 64,
+                          decoration: BoxDecoration(
+                            color: selected ? colors.primaryContainer : null,
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Icon(
+                            selected ? _selectedIcons[index] : _icons[index],
+                            color: selected
+                                ? colors.onPrimaryContainer
+                                : colors.onSurfaceVariant,
+                          ),
+                        ),
                       ),
                     ),
                   ),
