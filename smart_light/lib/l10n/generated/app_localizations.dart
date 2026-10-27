@@ -607,6 +607,270 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Turn on Bluetooth and choose your ESP32 in the browser dialog. HTTPS and a browser with Web Bluetooth support are required (for example, Chrome, Edge, or Yandex Browser).'**
   String get webBleInstructions;
+
+  /// No description provided for @ambientLight.
+  ///
+  /// In en, this message translates to:
+  /// **'Light around the lamp'**
+  String get ambientLight;
+
+  /// No description provided for @lightingAdvice.
+  ///
+  /// In en, this message translates to:
+  /// **'Lighting'**
+  String get lightingAdvice;
+
+  /// No description provided for @ambientDark.
+  ///
+  /// In en, this message translates to:
+  /// **'Dark'**
+  String get ambientDark;
+
+  /// No description provided for @ambientComfortable.
+  ///
+  /// In en, this message translates to:
+  /// **'Comfortable'**
+  String get ambientComfortable;
+
+  /// No description provided for @ambientBright.
+  ///
+  /// In en, this message translates to:
+  /// **'Bright'**
+  String get ambientBright;
+
+  /// No description provided for @ambientLoading.
+  ///
+  /// In en, this message translates to:
+  /// **'Reading sensor…'**
+  String get ambientLoading;
+
+  /// No description provided for @ambientNoData.
+  ///
+  /// In en, this message translates to:
+  /// **'No readings'**
+  String get ambientNoData;
+
+  /// No description provided for @ambientRefresh.
+  ///
+  /// In en, this message translates to:
+  /// **'Refresh readings'**
+  String get ambientRefresh;
+
+  /// No description provided for @ambientSharedSensor.
+  ///
+  /// In en, this message translates to:
+  /// **'Updates automatically'**
+  String get ambientSharedSensor;
+
+  /// No description provided for @ambientDeviceSensor.
+  ///
+  /// In en, this message translates to:
+  /// **'Updates automatically'**
+  String get ambientDeviceSensor;
+
+  /// No description provided for @ambientWaiting.
+  ///
+  /// In en, this message translates to:
+  /// **'Waiting for fresh sensor readings.'**
+  String get ambientWaiting;
+
+  /// No description provided for @ambientConnectionError.
+  ///
+  /// In en, this message translates to:
+  /// **'Cannot reach the sensor. Check the USB connection.'**
+  String get ambientConnectionError;
+
+  /// No description provided for @ambientRelativeNote.
+  ///
+  /// In en, this message translates to:
+  /// **'Relative photoresistor scale, not lux. Readings update automatically.'**
+  String get ambientRelativeNote;
+
+  /// No description provided for @lightingAdviceDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Suggest when to change the lamp brightness.'**
+  String get lightingAdviceDescription;
+
+  /// No description provided for @lightingAdviceDisabled.
+  ///
+  /// In en, this message translates to:
+  /// **'Advice is off'**
+  String get lightingAdviceDisabled;
+
+  /// No description provided for @lightingAdviceDisabledDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Enable advice to get brightness suggestions.'**
+  String get lightingAdviceDisabledDescription;
+
+  /// No description provided for @lightingAdviceEnable.
+  ///
+  /// In en, this message translates to:
+  /// **'Enable advice'**
+  String get lightingAdviceEnable;
+
+  /// No description provided for @lightingAdviceDarkTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'The room is dark'**
+  String get lightingAdviceDarkTitle;
+
+  /// No description provided for @lightingAdviceDarkBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Try increasing the lamp brightness.'**
+  String get lightingAdviceDarkBody;
+
+  /// No description provided for @lightingAdviceBrightTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'It is too bright'**
+  String get lightingAdviceBrightTitle;
+
+  /// No description provided for @lightingAdviceBrightBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Try reducing the lamp brightness.'**
+  String get lightingAdviceBrightBody;
+
+  /// No description provided for @lightingAdviceComfortTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'There is enough light'**
+  String get lightingAdviceComfortTitle;
+
+  /// No description provided for @lightingAdviceComfortBody.
+  ///
+  /// In en, this message translates to:
+  /// **'No brightness change is needed right now.'**
+  String get lightingAdviceComfortBody;
+
+  /// No description provided for @lightingAdviceChooseLamp.
+  ///
+  /// In en, this message translates to:
+  /// **'Lamp with the sensor'**
+  String get lightingAdviceChooseLamp;
+
+  /// No description provided for @lightingAdviceChooseLampHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Select a lamp'**
+  String get lightingAdviceChooseLampHint;
+
+  /// No description provided for @lightingAdviceNoLamps.
+  ///
+  /// In en, this message translates to:
+  /// **'Add a lamp to apply suggestions. The shared sensor can be read without selecting a lamp.'**
+  String get lightingAdviceNoLamps;
+
+  /// No description provided for @lightingAdviceApply.
+  ///
+  /// In en, this message translates to:
+  /// **'Set to'**
+  String get lightingAdviceApply;
+
+  /// No description provided for @lightingAdviceApplying.
+  ///
+  /// In en, this message translates to:
+  /// **'Applying…'**
+  String get lightingAdviceApplying;
+
+  /// No description provided for @lightingAdviceApplied.
+  ///
+  /// In en, this message translates to:
+  /// **'Lamp brightness updated'**
+  String get lightingAdviceApplied;
+
+  /// No description provided for @lightingAdviceApplyFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not change brightness. Check the lamp connection and try again.'**
+  String get lightingAdviceApplyFailed;
+
+  /// No description provided for @lightingAdviceAtLimit.
+  ///
+  /// In en, this message translates to:
+  /// **'The lamp brightness is already at its limit. Try adjusting the room lighting.'**
+  String get lightingAdviceAtLimit;
+
+  /// No description provided for @lightingAdviceManualNote.
+  ///
+  /// In en, this message translates to:
+  /// **'The change depends on the sensor’s distance from 50%. Lamp brightness stays within 0–100%; color and position are preserved.'**
+  String get lightingAdviceManualNote;
+
+  /// No description provided for @lightingAdviceHowItWorks.
+  ///
+  /// In en, this message translates to:
+  /// **'How it works'**
+  String get lightingAdviceHowItWorks;
+
+  /// No description provided for @lightingAdviceThresholds.
+  ///
+  /// In en, this message translates to:
+  /// **'0% means dark, 100% means bright. At 35–65% there is enough light. The further the reading is from 50%, the larger the suggested brightness change. Lamp brightness stays within 0–100%. This is a relative scale, not lux.'**
+  String get lightingAdviceThresholds;
+
+  /// No description provided for @lightingAdviceCurrentBrightness.
+  ///
+  /// In en, this message translates to:
+  /// **'Current lamp brightness'**
+  String get lightingAdviceCurrentBrightness;
+
+  /// No description provided for @lightingAdviceCorrection.
+  ///
+  /// In en, this message translates to:
+  /// **'Lamp brightness change'**
+  String get lightingAdviceCorrection;
+
+  /// No description provided for @lightingAdvicePoints.
+  ///
+  /// In en, this message translates to:
+  /// **'pp'**
+  String get lightingAdvicePoints;
+
+  /// No description provided for @lightingAdviceSensorLampMissing.
+  ///
+  /// In en, this message translates to:
+  /// **'The sensor’s lamp is not in this account. Check its Wi-Fi connection.'**
+  String get lightingAdviceSensorLampMissing;
+
+  /// No description provided for @lampStateUnknown.
+  ///
+  /// In en, this message translates to:
+  /// **'Lamp state is not available yet'**
+  String get lampStateUnknown;
+
+  /// No description provided for @lampIsOff.
+  ///
+  /// In en, this message translates to:
+  /// **'Lamp is off'**
+  String get lampIsOff;
+
+  /// No description provided for @lampIsOn.
+  ///
+  /// In en, this message translates to:
+  /// **'Lamp is on'**
+  String get lampIsOn;
+
+  /// No description provided for @lampTurnOnAt.
+  ///
+  /// In en, this message translates to:
+  /// **'Turn on at'**
+  String get lampTurnOnAt;
+
+  /// No description provided for @lampWaitingConfirmation.
+  ///
+  /// In en, this message translates to:
+  /// **'Waiting for the lamp to confirm…'**
+  String get lampWaitingConfirmation;
+
+  /// No description provided for @lampCommandFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'The lamp did not confirm the command. Check its connection.'**
+  String get lampCommandFailed;
 }
 
 class _AppLocalizationsDelegate

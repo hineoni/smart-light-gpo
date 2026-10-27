@@ -16,29 +16,61 @@ TextTheme readableTextTheme(Brightness brightness) {
     titleLarge: weight(base.titleLarge, FontWeight.w600),
     titleMedium: weight(base.titleMedium, FontWeight.w600),
     titleSmall: weight(base.titleSmall, FontWeight.w600),
-    bodyLarge: weight(base.bodyLarge, FontWeight.w500),
-    bodyMedium: weight(base.bodyMedium, FontWeight.w500),
-    bodySmall: weight(base.bodySmall, FontWeight.w500),
+    bodyLarge: weight(
+      base.bodyLarge,
+      brightness == Brightness.dark ? FontWeight.w500 : FontWeight.w400,
+    ),
+    bodyMedium: weight(
+      base.bodyMedium,
+      brightness == Brightness.dark ? FontWeight.w500 : FontWeight.w400,
+    ),
+    bodySmall: weight(
+      base.bodySmall,
+      brightness == Brightness.dark ? FontWeight.w500 : FontWeight.w400,
+    ),
     labelLarge: weight(base.labelLarge, FontWeight.w600),
     labelMedium: weight(base.labelMedium, FontWeight.w600),
     labelSmall: weight(base.labelSmall, FontWeight.w600),
   );
 }
 
-ThemeData buildLightTheme() {
-  final scheme = ColorScheme.fromSeed(
-    seedColor: Colors.blue,
-    brightness: Brightness.light,
-  );
-
+ThemeData _buildTheme(ColorScheme scheme, Color background) {
   return ThemeData(
     colorScheme: scheme,
     useMaterial3: true,
     fontFamily: 'Avenir Next',
-    textTheme: readableTextTheme(Brightness.light),
+    textTheme: readableTextTheme(scheme.brightness),
+    scaffoldBackgroundColor: background,
     appBarTheme: AppBarTheme(
-      backgroundColor: scheme.surface,
+      backgroundColor: background,
       foregroundColor: scheme.onSurface,
+      surfaceTintColor: Colors.transparent,
+      elevation: 0,
+      scrolledUnderElevation: 0,
+    ),
+    cardTheme: CardThemeData(
+      color: scheme.surfaceContainerLow,
+      elevation: 0,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(18),
+        side: BorderSide(color: scheme.outlineVariant.withValues(alpha: 0.6)),
+      ),
+    ),
+    inputDecorationTheme: InputDecorationTheme(
+      filled: true,
+      fillColor: scheme.surfaceContainerLowest,
+      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+      enabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: BorderSide(color: scheme.outlineVariant),
+      ),
+    ),
+    filledButtonTheme: FilledButtonThemeData(
+      style: FilledButton.styleFrom(
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 15),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      ),
     ),
     navigationBarTheme: NavigationBarThemeData(
       backgroundColor: scheme.surface,
@@ -47,75 +79,81 @@ ThemeData buildLightTheme() {
         TextStyle(fontWeight: FontWeight.w600),
       ),
     ),
+    dividerTheme: DividerThemeData(color: scheme.outlineVariant, thickness: 1),
   );
 }
 
-ThemeData buildGreenTheme() {
-  final scheme =
-      ColorScheme.fromSeed(
-        seedColor: const Color(0xFF008F73),
-        brightness: Brightness.light,
-      ).copyWith(
-        primary: const Color(0xFF007A61),
-        onPrimary: Colors.white,
-        secondary: const Color(0xFF00B894),
-        primaryContainer: const Color(0xFF006B55),
-        onPrimaryContainer: Colors.white,
-        surface: const Color(0xFFE5FFF7),
-        surfaceContainerHighest: const Color(0xFFB8F5E2),
-      );
+ThemeData buildDarkTheme() => ThemeData(
+  brightness: Brightness.dark,
+  fontFamily: 'Avenir Next',
+  textTheme: readableTextTheme(Brightness.dark),
+  navigationBarTheme: const NavigationBarThemeData(
+    backgroundColor: Color(0xFF1C1B1F),
+    indicatorColor: Color(0xFF3F51B5),
+    labelTextStyle: WidgetStatePropertyAll(
+      TextStyle(fontWeight: FontWeight.w600),
+    ),
+  ),
+);
 
-  return ThemeData(
-    colorScheme: scheme,
-    useMaterial3: true,
-    fontFamily: 'Avenir Next',
-    textTheme: readableTextTheme(Brightness.light),
-    scaffoldBackgroundColor: const Color(0xFFD6FFF3),
-    appBarTheme: AppBarTheme(
-      backgroundColor: const Color(0xFFB8F5E2),
-      foregroundColor: const Color(0xFF003D30),
-    ),
-    navigationBarTheme: const NavigationBarThemeData(
-      backgroundColor: Color(0xFF8FE6D0),
-      indicatorColor: Color(0xFF007A61),
-      labelTextStyle: WidgetStatePropertyAll(
-        TextStyle(fontWeight: FontWeight.w700),
-      ),
-    ),
-  );
-}
+ThemeData buildLightTheme() => _buildTheme(
+  ColorScheme.fromSeed(seedColor: const Color(0xFF7456AD)).copyWith(
+    primary: const Color(0xFF7456AD),
+    onPrimary: Colors.white,
+    primaryContainer: const Color(0xFFEADFFF),
+    onPrimaryContainer: const Color(0xFF382458),
+    tertiary: const Color(0xFF8C632C),
+    surface: const Color(0xFFFFFDFF),
+    surfaceContainerLowest: Colors.white,
+    surfaceContainerLow: const Color(0xFFFEFCFF),
+    surfaceContainerHighest: const Color(0xFFEEE7F6),
+    outlineVariant: const Color(0xFFE4DBEE),
+  ),
+  const Color(0xFFF9F6FF),
+);
 
-ThemeData buildIndigoTheme() {
-  const blue = Color(0xFF005BFF);
-  final scheme =
-      ColorScheme.fromSeed(
-        seedColor: blue,
-        brightness: Brightness.light,
-      ).copyWith(
-        primary: blue,
-        onPrimary: Colors.white,
-        secondary: const Color(0xFF00A6FF),
-        primaryContainer: const Color(0xFF0048C7),
-        onPrimaryContainer: Colors.white,
-        surface: const Color(0xFFEAF1FF),
-        surfaceContainerHighest: const Color(0xFFC9DAFF),
-      );
-  return ThemeData(
-    colorScheme: scheme,
-    useMaterial3: true,
-    fontFamily: 'Avenir Next',
-    textTheme: readableTextTheme(Brightness.light),
-    scaffoldBackgroundColor: const Color(0xFFDCE8FF),
-    appBarTheme: const AppBarTheme(
-      backgroundColor: Color(0xFFC9DAFF),
-      foregroundColor: Color(0xFF002E78),
-    ),
-    navigationBarTheme: const NavigationBarThemeData(
-      backgroundColor: Color(0xFFACC7FF),
-      indicatorColor: Color(0xFF005BFF),
-      labelTextStyle: WidgetStatePropertyAll(
-        TextStyle(fontWeight: FontWeight.w700),
-      ),
-    ),
-  );
-}
+ThemeData buildGreenTheme() => _buildTheme(
+  ColorScheme.fromSeed(
+    seedColor: const Color(0xFF00BE87),
+    brightness: Brightness.dark,
+  ).copyWith(
+    primary: const Color(0xFF5CE1AE),
+    onPrimary: const Color(0xFF003826),
+    primaryContainer: const Color(0xFF087957),
+    onPrimaryContainer: const Color(0xFFE9FFF4),
+    tertiary: const Color(0xFFF7D17A),
+    surface: const Color(0xFF0B463A),
+    surfaceContainerLowest: const Color(0xFF07382E),
+    surfaceContainerLow: const Color(0xFF115040),
+    surfaceContainer: const Color(0xFF175D4B),
+    surfaceContainerHigh: const Color(0xFF1B6754),
+    surfaceContainerHighest: const Color(0xFF247B65),
+    onSurface: const Color(0xFFE6FFF2),
+    onSurfaceVariant: const Color(0xFFB7E6D1),
+    outlineVariant: const Color(0xFF337F6A),
+  ),
+  const Color(0xFF073B31),
+);
+
+ThemeData buildIndigoTheme() => _buildTheme(
+  ColorScheme.fromSeed(
+    seedColor: const Color(0xFF386BFF),
+    brightness: Brightness.dark,
+  ).copyWith(
+    primary: const Color(0xFFB0CEFF),
+    onPrimary: const Color(0xFF102D69),
+    primaryContainer: const Color(0xFF3B63CC),
+    onPrimaryContainer: Colors.white,
+    tertiary: const Color(0xFFFFD28A),
+    surface: const Color(0xFF193B85),
+    surfaceContainerLowest: const Color(0xFF10275D),
+    surfaceContainerLow: const Color(0xFF1D4197),
+    surfaceContainer: const Color(0xFF244CA2),
+    surfaceContainerHigh: const Color(0xFF2D56AD),
+    surfaceContainerHighest: const Color(0xFF365DA5),
+    onSurface: const Color(0xFFF0F5FF),
+    onSurfaceVariant: const Color(0xFFC2D4F8),
+    outlineVariant: const Color(0xFF456BB3),
+  ),
+  const Color(0xFF142F75),
+);

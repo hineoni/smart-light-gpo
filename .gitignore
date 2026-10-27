@@ -27,3 +27,4 @@ firmware/*.elf
 firmware/*.map
 firmware/*.hex
 firmware/*.uf2
+__pycache__/

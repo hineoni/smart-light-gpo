@@ -30,6 +30,16 @@ typedef struct {
 } led_controller_state_t;
 
 static led_controller_state_t s_led_state = {0};
+static portMUX_TYPE s_status_lock = portMUX_INITIALIZER_UNLOCKED;
+static led_controller_status_t s_confirmed_status;
+
+void led_controller_get_status(led_controller_status_t *status)
+{
+    if (status == NULL) return;
+    portENTER_CRITICAL(&s_status_lock);
+    *status = s_confirmed_status;
+    portEXIT_CRITICAL(&s_status_lock);
+}
 
 esp_err_t led_controller_init(const led_controller_config_t *config)
 {
@@ -120,6 +130,9 @@ esp_err_t led_controller_deinit(void)
     }
 
     s_led_state.initialized = false;
+    portENTER_CRITICAL(&s_status_lock);
+    s_confirmed_status.available = false;
+    portEXIT_CRITICAL(&s_status_lock);
     
     ESP_LOGI(TAG, "LED controller deinitialized");
     return ESP_OK;
@@ -196,6 +209,23 @@ esp_err_t led_controller_update(void)
         ESP_LOGE(TAG, "Failed to wait for transmission: %s", esp_err_to_name(ret));
         return ret;
     }
+
+    bool is_on = false;
+    for (int i = 0; i < s_led_state.led_count * 3; i++) {
+        if (s_led_state.led_strip_pixels[i] != 0) {
+            is_on = true;
+            break;
+        }
+    }
+    const led_controller_status_t confirmed = {
+        .available = true,
+        .is_on = is_on,
+        .brightness = is_on ? s_led_state.brightness : 0,
+        .color = s_led_state.current_color,
+    };
+    portENTER_CRITICAL(&s_status_lock);
+    s_confirmed_status = confirmed;
+    portEXIT_CRITICAL(&s_status_lock);
 
     return ESP_OK;
 }

@@ -20,6 +20,7 @@
 #include "uwb_positioning.h"
 #include "web_server.h"
 #include "websocket_client.h"
+#include "light_sensor.h"
 #include "driver/gpio.h"
 #include "driver/uart.h"
 
@@ -370,6 +371,11 @@ static esp_err_t init_system(void)
         return ret;
     }
     
+    ret = light_sensor_init();
+    if (ret != ESP_OK) {
+        ESP_LOGW(TAG, "Light sensor unavailable: %s", esp_err_to_name(ret));
+    }
+
     // Инициализация веб-сервера
     ESP_LOGI(TAG, "Initializing web server...");
     ret = web_server_init(&g_device_config);

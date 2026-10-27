@@ -9,6 +9,7 @@ interface HeartbeatMsg extends IncomingBase {
   deviceId?: string;
   servo1?: { angle: number };
   servo2?: { angle: number };
+  ambientLight?: { available: boolean; raw?: number; percent?: number };
   uwb?: {
     ready?: boolean;
     rangeCount?: number;
@@ -87,14 +88,14 @@ export default defineWebSocketHandler({
     }
 
     if (payload.type === 'heartbeat') {
-      let rt = updateHeartbeat(peer.id, payload.servo1?.angle, payload.servo2?.angle, payload.uwb);
+      let rt = updateHeartbeat(peer.id, payload.servo1?.angle, payload.servo2?.angle, payload.uwb, payload.ambientLight);
       if (!rt?.deviceId && typeof payload.deviceId === 'string' && payload.deviceId.length > 0) {
         if (!(await getDevice(payload.deviceId))) {
           const clientIP = peer.request?.socket?.remoteAddress || 'unknown';
           await autoRegisterDevice(payload.deviceId, clientIP);
         }
         registerPeer(payload.deviceId, peer);
-        rt = updateHeartbeat(peer.id, payload.servo1?.angle, payload.servo2?.angle, payload.uwb);
+        rt = updateHeartbeat(peer.id, payload.servo1?.angle, payload.servo2?.angle, payload.uwb, payload.ambientLight);
       }
       if (rt?.deviceId) {
         await updateDeviceStatus(rt.deviceId, 'connected');

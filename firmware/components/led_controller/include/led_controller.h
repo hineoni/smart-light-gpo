@@ -27,6 +27,16 @@ typedef struct {
     int led_count;          ///< Количество светодиодов в ленте
 } led_controller_config_t;
 
+typedef struct {
+    bool available;
+    bool is_on;
+    uint8_t brightness;
+    led_rgb_t color;
+} led_controller_status_t;
+
+// Snapshot of the last successfully transmitted frame.
+void led_controller_get_status(led_controller_status_t *status);
+
 /**
  * @brief Инициализация LED контроллера
  * 

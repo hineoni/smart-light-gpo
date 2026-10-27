@@ -9,6 +9,7 @@ import 'screens/device_control_screen.dart';
 import 'screens/device_list_screen.dart';
 import 'screens/email_verification_screen.dart';
 import 'screens/login_screen.dart';
+import 'screens/lighting_advice_screen.dart';
 import 'screens/main_navigation_screen.dart';
 import 'screens/password_reset_screen.dart';
 import 'screens/positioning_screen.dart';
@@ -70,6 +71,14 @@ GoRouter createAppRouter(Future<bool> restoreSession) {
               GoRoute(
                 path: '/positioning',
                 builder: (_, _) => const PositioningScreen(),
+              ),
+            ],
+          ),
+          StatefulShellBranch(
+            routes: [
+              GoRoute(
+                path: '/lighting-advice',
+                builder: (_, _) => const LightingAdviceScreen(),
               ),
             ],
           ),

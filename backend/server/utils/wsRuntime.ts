@@ -1,7 +1,10 @@
+import { parseAmbientLight, type AmbientLightReading } from './ambientLight';
+
 interface RuntimeEntry {
   deviceId: string;
   peer: any; // Nitro CrossWS peer
   lastHeartbeat: number;
+  ambientLight?: AmbientLightReading;
   servo1Angle?: number;
   servo2Angle?: number;
   uwbReady?: boolean;
@@ -53,11 +56,14 @@ export function updateHeartbeat(
     period?: number;
     localAddress?: number;
     peer0Address?: number;
-  }
+  },
+  ambientLight?: unknown,
 ) {
   const entry = runtime.get(peerId);
   if (!entry) return null;
   entry.lastHeartbeat = Date.now();
+  // Missing/invalid measurements must not make an old measurement look fresh.
+  entry.ambientLight = parseAmbientLight(ambientLight);
   if (typeof s1 === 'number') entry.servo1Angle = s1;
   if (typeof s2 === 'number') entry.servo2Angle = s2;
   if (typeof uwb?.ready === 'boolean') entry.uwbReady = uwb.ready;

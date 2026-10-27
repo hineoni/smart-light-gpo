@@ -276,4 +276,148 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get webBleInstructions =>
       'Turn on Bluetooth and choose your ESP32 in the browser dialog. HTTPS and a browser with Web Bluetooth support are required (for example, Chrome, Edge, or Yandex Browser).';
+
+  @override
+  String get ambientLight => 'Light around the lamp';
+
+  @override
+  String get lightingAdvice => 'Lighting';
+
+  @override
+  String get ambientDark => 'Dark';
+
+  @override
+  String get ambientComfortable => 'Comfortable';
+
+  @override
+  String get ambientBright => 'Bright';
+
+  @override
+  String get ambientLoading => 'Reading sensor…';
+
+  @override
+  String get ambientNoData => 'No readings';
+
+  @override
+  String get ambientRefresh => 'Refresh readings';
+
+  @override
+  String get ambientSharedSensor => 'Updates automatically';
+
+  @override
+  String get ambientDeviceSensor => 'Updates automatically';
+
+  @override
+  String get ambientWaiting => 'Waiting for fresh sensor readings.';
+
+  @override
+  String get ambientConnectionError =>
+      'Cannot reach the sensor. Check the USB connection.';
+
+  @override
+  String get ambientRelativeNote =>
+      'Relative photoresistor scale, not lux. Readings update automatically.';
+
+  @override
+  String get lightingAdviceDescription =>
+      'Suggest when to change the lamp brightness.';
+
+  @override
+  String get lightingAdviceDisabled => 'Advice is off';
+
+  @override
+  String get lightingAdviceDisabledDescription =>
+      'Enable advice to get brightness suggestions.';
+
+  @override
+  String get lightingAdviceEnable => 'Enable advice';
+
+  @override
+  String get lightingAdviceDarkTitle => 'The room is dark';
+
+  @override
+  String get lightingAdviceDarkBody => 'Try increasing the lamp brightness.';
+
+  @override
+  String get lightingAdviceBrightTitle => 'It is too bright';
+
+  @override
+  String get lightingAdviceBrightBody => 'Try reducing the lamp brightness.';
+
+  @override
+  String get lightingAdviceComfortTitle => 'There is enough light';
+
+  @override
+  String get lightingAdviceComfortBody =>
+      'No brightness change is needed right now.';
+
+  @override
+  String get lightingAdviceChooseLamp => 'Lamp with the sensor';
+
+  @override
+  String get lightingAdviceChooseLampHint => 'Select a lamp';
+
+  @override
+  String get lightingAdviceNoLamps =>
+      'Add a lamp to apply suggestions. The shared sensor can be read without selecting a lamp.';
+
+  @override
+  String get lightingAdviceApply => 'Set to';
+
+  @override
+  String get lightingAdviceApplying => 'Applying…';
+
+  @override
+  String get lightingAdviceApplied => 'Lamp brightness updated';
+
+  @override
+  String get lightingAdviceApplyFailed =>
+      'Could not change brightness. Check the lamp connection and try again.';
+
+  @override
+  String get lightingAdviceAtLimit =>
+      'The lamp brightness is already at its limit. Try adjusting the room lighting.';
+
+  @override
+  String get lightingAdviceManualNote =>
+      'The change depends on the sensor’s distance from 50%. Lamp brightness stays within 0–100%; color and position are preserved.';
+
+  @override
+  String get lightingAdviceHowItWorks => 'How it works';
+
+  @override
+  String get lightingAdviceThresholds =>
+      '0% means dark, 100% means bright. At 35–65% there is enough light. The further the reading is from 50%, the larger the suggested brightness change. Lamp brightness stays within 0–100%. This is a relative scale, not lux.';
+
+  @override
+  String get lightingAdviceCurrentBrightness => 'Current lamp brightness';
+
+  @override
+  String get lightingAdviceCorrection => 'Lamp brightness change';
+
+  @override
+  String get lightingAdvicePoints => 'pp';
+
+  @override
+  String get lightingAdviceSensorLampMissing =>
+      'The sensor’s lamp is not in this account. Check its Wi-Fi connection.';
+
+  @override
+  String get lampStateUnknown => 'Lamp state is not available yet';
+
+  @override
+  String get lampIsOff => 'Lamp is off';
+
+  @override
+  String get lampIsOn => 'Lamp is on';
+
+  @override
+  String get lampTurnOnAt => 'Turn on at';
+
+  @override
+  String get lampWaitingConfirmation => 'Waiting for the lamp to confirm…';
+
+  @override
+  String get lampCommandFailed =>
+      'The lamp did not confirm the command. Check its connection.';
 }

@@ -2,6 +2,7 @@
 #include "servo_controller.h"
 #include "led_controller.h"
 #include "uwb_positioning.h"
+#include "light_sensor.h"
 #include "cJSON.h"
 #include "esp_log.h"
 #include "esp_crt_bundle.h"
@@ -473,6 +474,27 @@ esp_err_t websocket_client_send_heartbeat(void)
         if (ranges != NULL) cJSON_Delete(ranges);
     }
     
+    light_sensor_reading_t reading = light_sensor_get_reading();
+    cJSON *ambient = cJSON_AddObjectToObject(heartbeat_json, "ambientLight");
+    if (ambient != NULL) {
+        cJSON_AddBoolToObject(ambient, "available", reading.available);
+        if (reading.available) {
+            cJSON_AddNumberToObject(ambient, "raw", reading.raw);
+            cJSON_AddNumberToObject(ambient, "percent", reading.percent);
+        }
+        led_controller_status_t status = {0};
+        led_controller_get_status(&status);
+        cJSON *lamp = cJSON_AddObjectToObject(ambient, "lamp");
+        if (lamp != NULL) {
+            cJSON_AddBoolToObject(lamp, "available", status.available);
+            cJSON_AddBoolToObject(lamp, "isOn", status.is_on);
+            cJSON_AddNumberToObject(lamp, "brightness", status.brightness);
+            cJSON_AddNumberToObject(lamp, "r", status.color.r);
+            cJSON_AddNumberToObject(lamp, "g", status.color.g);
+            cJSON_AddNumberToObject(lamp, "b", status.color.b);
+        }
+    }
+
     ESP_LOGD(TAG, "Sending heartbeat with servo1=%d, servo2=%d", status.angle1, status.angle2);
     
     esp_err_t ret = send_json_message(heartbeat_json);
