@@ -207,6 +207,8 @@ export async function deleteDevice(userId: string, id: string): Promise<boolean>
     data: {
       userId: null,
       zoneId: null,
+      ambientLux: null,
+      ambientMeasuredAt: null,
     },
   });
 

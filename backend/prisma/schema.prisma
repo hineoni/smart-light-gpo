@@ -21,6 +21,10 @@ model User {
 
   emailVerifiedAt        DateTime?
   emailVerificationCodes EmailVerificationCode[]
+
+  lightingTargetLux     Int @default(300)
+  lightingMinBrightness Int @default(0)
+  lightingMaxBrightness Int @default(255)
 }
 
 model EmailVerificationCode {
@@ -59,6 +63,8 @@ model Device {
   colorR            Int?
   colorG            Int?
   colorB            Int?
+  ambientLux        Float?
+  ambientMeasuredAt DateTime?
   lastHeartbeat     DateTime?
   uwbReady          Boolean?
   uwbRangeCount     Int?

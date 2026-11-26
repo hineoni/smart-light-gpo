@@ -126,6 +126,8 @@ flutter run -d chrome --web-port 5000 --dart-define=API_BASE_URL=http://localhos
 | `/devices/:id` | PUT | Переименовать устройство |
 | `/devices/:id` | DELETE | Отвязать устройство от пользователя |
 | `/devices/:id/status` | GET | Получить статус устройства |
+| `/devices/:id/ambient-light` | GET | Получить относительную освещённость и состояние лампы от контроллера |
+| `/devices/:id/ambient-light` | POST | Передать замер освещённости для своего устройства |
 | `/devices/:id/led` | POST | Управление светом устройства |
 | `/devices/:id/servo` | GET | Получить состояние сервопривода |
 | `/devices/:id/servo` | POST | Управление сервоприводами |
@@ -139,11 +141,30 @@ flutter run -d chrome --web-port 5000 --dart-define=API_BASE_URL=http://localhos
 | `/scenes/:id` | PUT | Обновить параметры сцены |
 | `/scenes/:id` | DELETE | Удалить сцену |
 | `/scenes/:id/apply` | POST | Применить сцену к устройствам |
+| `/recommendations` | GET | Получить рекомендуемую яркость, при необходимости указать `zoneId` |
+| `/recommendations/preferences` | GET | Получить предпочтения по освещению |
+| `/recommendations/preferences` | PUT | Сохранить целевую освещённость и границы яркости |
 | `/_openapi.json` | ANY | OpenAPI (Swagger) спецификация |
 | `/_scalar` | ANY | Scalar UI для просмотра OpenAPI |
 
 Большинство эндпоинтов, кроме `/`, `/_ws`, `/health`, `/auth/register`, `/auth/login`, `/auth/refresh`, `/_openapi.json` и `/_scalar`, требуют заголовок `Authorization: Bearer <accessToken>`.
 
+
+### Рекомендации по освещению
+
+Все маршруты рекомендаций и приёма замеров требуют токен пользователя.
+Вкладка советов Flutter использует относительные показания датчика из `GET /devices/:id/ambient-light`.
+Для серверных рекомендаций источник передаёт освещённость в люксах (`lux`) и время замера
+`measuredAt` в формате ISO 8601 с часовым поясом
+через `POST /devices/:id/ambient-light`. Сервер хранит последний замер для устройства владельца.
+
+`PUT /recommendations/preferences` принимает `targetLux`, `minBrightness` и `maxBrightness`.
+По умолчанию целевая освещённость равна 300 лк, диапазон яркости — от 0 до 255.
+Яркость растёт пропорционально дефициту освещённости в пределах выбранного диапазона.
+Расчёт использует среднее свежих замеров в зоне или собственный замер устройства без зоны.
+Если свежих замеров нет и последнему замеру уже пять минут или больше, API возвращает
+`stale_telemetry`. При отсутствии замеров API возвращает `missing_telemetry`.
+`GET /recommendations` возвращает предложенные значения для клиента.
 
 ## Как устроена система
 
